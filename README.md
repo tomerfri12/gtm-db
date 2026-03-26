@@ -1,49 +1,35 @@
 # GtmDB
 
-Managed graph service for CRM data. **The graph backend is owned by this package**; host apps use the `gtmdb` Python client (`connect_gtmdb`, entity APIs) and never pass in SQL engines or app databases.
+<p align="center">
+  <img src="docs/assets/gtm-db-logo.png" alt="GtmDB" width="280" />
+</p>
 
-Access tokens for `gtmdb.scope.Scope` are plain in-memory objects; if a host app persists them, that lives in the host’s own store (e.g. CRM2’s Postgres).
+## Overview — what is GtmDB?
 
-## Local graph store
+**GtmDB** is the **full-stack data layer** built for the era of GTM autonomous operations. While most agentic systems rely on scattered data and rigid tables without awareness of permissions, GtmDB — backed by **multi-model storage** — provides agents exactly what they need to make high-integrity, autonomous choices without exposing unnecessary information. Whether your agents are built on **OpenAI Frontier, Claude Cowork, or LangGraph**, **GtmDB** provides them with secure access to your business data, so they can run your business.
 
-From this directory:
+### What GtmDB supports
 
-```bash
-docker compose up -d
-```
+1. **One system of record for GTM — and the agents that use it.** Typed CRUD and traversals over the commercial graph — accounts through campaigns plus activities, comms, events, insights, and operational stats in one entity model — so one store can back **MCP** servers, LangChain-style tools, and bindings for common agent stacks (**LangGraph**, **Vertex AI**, **OpenClaw**, and similar) instead of every assistant re-wrapping a different partial API per system.
 
-Default ports: **7474** (HTTP/Browser), **7687** (Bolt). Auth matches `NEO4J_AUTH` in `docker-compose.yml` (`neo4j` / `crmdb_password`).
+2. **Security, permissions, and access out of the box — for people and for agents.** Every call runs under a `Scope` tied to declarative policies: tenant isolation, read/write rules, field-level masking, and redaction. Issue different tokens for a human rep, an internal agent, or an external partner so you **control exactly what each principal sees and can change**.
 
-## Bootstrap schema (operators / new environments)
+3. **Triggers and automation hooks.** Design your stack so events in GtmDB drive downstream behavior: e.g. **trigger an agent when a deal closes**, when a **campaign is sent**, or when signals indicate **learning** or coaching moments — closing the loop between CRM state and autonomous workflows.
 
-Run once against a **new** graph instance before clients rely on indexes/constraints. With a `.env` in the **current working directory** (repo root) containing `GTMDB_*` from `.env.example`:
+4. **Agents can ask anything — from facts, to analytical and statistical questions.** The graph + indexed analytical store model supports exploratory and quantitative questions over your pipeline and GTM motion: strategic prompts (“*why are we losing to competitors?*” in context of your deals and accounts) and statistical views (funnels, attribution, stage distributions) on top of the same CRM-native store — not a separate BI silo.
 
-```bash
-python -m gtmdb init
-python -m gtmdb init --seed   # optional demo nodes
-```
+## Sales, marketing & customer success — one system of record
 
-Or, after `pip install -e ./crmdb`:
+The entity model is deliberately **cross-functional**: the same graph holds what **marketing**, **sales**, and **customer success (CS)** care about, so GtmDB can serve as the **ideal system of record for the whole revenue business** — not three disconnected spreadsheets or siloed tools.
 
-```bash
-gtmdb init --seed
-```
+- **Marketing** — `Campaign`, `Lead`, segments and lists, content and landing experiences, form and page-view events, attribution touchpoints, and links to `Deal` (`INFLUENCED`). Full-text search over accounts and programs; pipeline visibility stays tied to the same graph sales uses.
 
-## Connect later (Neo4j Browser / console)
+- **Sales** — `Account` / `Contact` hierarchy, `Deal`, quotes, orders, products, contracts, comms (email, call, meeting), tasks, and partner accounts — plus traversals (360°, path-finding) for account planning and multi-threading.
 
-- **Browser:** open `http://localhost:7474`, sign in with `neo4j` and your password (`crmdb_password` with the bundled compose).
-- **cypher-shell** (from the Neo4j container):
+- **Customer success & support** — Tickets, SLAs, health scores, renewal context on the same `Account` graph as sales; timeline from emails, meetings, usage events, and notes so CS, sales, and marketing share one customer truth.
 
-  ```bash
-  docker compose exec neo4j cypher-shell -u neo4j -p crmdb_password
-  ```
+- **RevOps & leadership** — Metric snapshots, forecasts, dashboards/reports, and AI or rule-driven **insights** materialized on top of the same store — no shadow warehouse required for operational GTM questions.
 
-  Quick check after `init --seed`:
+Because every department reads and writes through the **same CRM-native API** under `Scope`, you avoid duplicate “shadow” CRMs: one store, one permission model, one place agents and humans query when they need the full picture of a customer or campaign.
 
-  ```cypher
-  MATCH (n) RETURN labels(n)[0] AS label, count(*) AS n LIMIT 25;
-  ```
-
-## Host application (CRM2)
-
-CRM2 calls `connect_gtmdb()` only (no Postgres engine, no GtmDB “init” from the app). Set `GTMDB_*` so the client reaches an already-running graph endpoint.
+Under the hood, GtmDB stores CRM entities as **nodes and relationships** in **Neo4j** (labels such as `Lead`, `Account`, `Deal`, etc.). That choice enables graph traversals (360° views, timelines, attribution paths, search). Applications integrate through the **`GtmDB`** Python client; host apps may persist issued tokens in their own database (e.g. via SQLAlchemy); the token row holds JSON policies that drive authorization.
