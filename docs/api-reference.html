@@ -382,6 +382,7 @@
           <summary class="nav-section-summary">Graph &amp; queries</summary>
           <div class="nav-section-inner">
           <a href="#relationships">Relationships</a>
+          <a href="#edge-reasoning">Edge reasoning</a>
           <a href="#low-level">Low-level</a>
           <a href="#traversals">Traversals</a>
           </div>
@@ -897,36 +898,58 @@ await db.deals.add_contact(scope, d.id, c.id)</code></pre>
       <table>
         <thead><tr><th>Method</th><th>Parameters</th><th>Returns</th></tr></thead>
         <tbody>
-          <tr><td><code class="method">create</code></td><td><code>scope</code>, <code>from_id</code>, <code>rel_type</code>, <code>to_id</code>, <strong>**props</strong></td><td><code>Relationship</code></td></tr>
+          <tr><td><code class="method">create</code></td><td><code>scope</code>, <code>from_id</code>, <code>rel_type</code>, <code>to_id</code>, optional <code>reasoning=None</code>, <strong>**props</strong></td><td><code>Relationship</code> (includes stored rel properties, e.g. <code>reasoning</code>)</td></tr>
           <tr><td><code class="method">list</code></td><td><code>scope</code>, <code>node_id</code>, <code>rel_type=None</code>, <code>direction="both"</code> (<code>out</code>|<code>in</code>|<code>both</code>), <code>limit=100</code></td><td><code>list[Relationship]</code></td></tr>
           <tr><td><code class="method">delete</code></td><td><code>scope</code>, <code>from_id</code>, <code>rel_type</code>, <code>to_id</code></td><td><code>bool</code></td></tr>
         </tbody>
       </table>
       <pre><code>await db.relationships.create(scope, lead_id, "WORKS_AT", account_id)
+await db.relationships.create(
+    scope, lead_id, "WORKS_AT", account_id, reasoning="Matched company domain in enrichment"
+)
 rels = await db.relationships.list(scope, node_id, rel_type="WORKS_AT", direction="out")
 await db.relationships.delete(scope, lead_id, "WORKS_AT", account_id)</code></pre>
+
+      <h3 id="edge-reasoning">Relationship properties &amp; <code>reasoning</code></h3>
+      <p>
+        Many edge-creating APIs accept an optional keyword argument <code>reasoning</code> (short text).
+        It is stored on the Neo4j relationship as the property <code>reasoning</code> (merged with any
+        other relationship properties). Use it to record <em>why</em> an edge was created (agent or human).
+      </p>
+      <ul class="params">
+        <li><code>EdgeData(..., reasoning="…")</code> or <code>db.create_edge(scope, EdgeData(..., reasoning="…"))</code></li>
+        <li><code>relationships.create(..., reasoning="…", **props)</code> — explicit <code>reasoning</code> wins over a <code>reasoning</code> key inside <code>**props</code> if both are set.</li>
+        <li>Entity <code>create</code> / <code>update</code>: reserved kwarg <code>reasoning</code> applies to the <code>CREATED_BY</code> / <code>UPDATED_BY</code> audit edge.</li>
+        <li>Typed helpers: <code>leads.assign_to_account</code>, <code>leads.link_campaign</code>, <code>contacts.assign_to_account</code>, <code>deals.assign_to_account</code>, <code>deals.add_contact</code>, <code>deals.add_campaign</code>, <code>campaigns.link_deal</code> — each accepts <code>reasoning=None</code>.</li>
+        <li><code>scores.create</code> — use <code>has_score_reasoning</code> for the <code>HAS_SCORE</code> edge (plus optional <code>reasoning</code> on <code>CREATED_BY</code> via the entity API).</li>
+        <li><code>email_campaigns.create_with_artifacts</code> — <code>has_email_reasoning</code> (every <code>HAS_EMAIL</code> in the batch), <code>sourced_from_reasoning</code> (each <code>SOURCED_FROM</code> from leads).</li>
+      </ul>
+      <p>
+        <code>relationships.list</code> returns each relationship’s <code>properties</code> dict (including <code>reasoning</code> when present).
+        <code>get_neighbors</code> and each item in <code>entity_360</code>’s <code>connected</code> list include <code>edge_properties</code>: the property map of the <strong>traversing</strong> relationship (again including <code>reasoning</code>).
+      </p>
 
       <h2 id="low-level">Low-level <code>CrmDB</code></h2>
       <table>
         <thead><tr><th>Method</th><th>Parameters</th><th>Notes</th></tr></thead>
         <tbody>
           <tr><td><code class="method">create_node</code></td><td><code>scope</code>, <code>node: NodeData</code></td><td>Arbitrary label + properties</td></tr>
-          <tr><td><code class="method">create_edge</code></td><td><code>scope</code>, <code>edge: EdgeData</code></td><td><code>type</code>, <code>from_id</code>, <code>to_id</code>, optional <code>properties</code></td></tr>
+          <tr><td><code class="method">create_edge</code></td><td><code>scope</code>, <code>edge: EdgeData</code></td><td><code>type</code>, <code>from_id</code>, <code>to_id</code>, optional <code>properties</code>, optional <code>reasoning</code> (stored as rel property)</td></tr>
           <tr><td><code class="method">get_node</code></td><td><code>scope</code>, <code>label</code>, <code>node_id</code></td><td><code>NodeData | None</code></td></tr>
-          <tr><td><code class="method">get_neighbors</code></td><td><code>scope</code>, <code>node_id</code>, <code>edge_types=None</code>, <code>direction="both"</code></td><td>List of dicts with <code>node</code>, <code>edge_type</code></td></tr>
+          <tr><td><code class="method">get_neighbors</code></td><td><code>scope</code>, <code>node_id</code>, <code>edge_types=None</code>, <code>direction="both"</code></td><td>List of dicts: <code>node</code>, <code>edge_type</code>, <code>edge_properties</code> (relationship props, e.g. <code>reasoning</code>)</td></tr>
           <tr><td><code class="method">execute_cypher</code></td><td><code>scope</code>, <code>query: str</code>, <code>params=None</code></td><td>Injects <code>tenant_id</code>; use with care</td></tr>
         </tbody>
       </table>
-      <pre><code>from crmdb.types import NodeData, EdgeData
+      <pre><code>from gtmdb.types import NodeData, EdgeData
 
 node = await db.create_node(scope, NodeData("Tag", "", "", {"name": "hot"}))
-edge = await db.create_edge(scope, EdgeData("TAGGED", from_id, to_id))</code></pre>
+edge = await db.create_edge(scope, EdgeData("TAGGED", from_id, to_id, reasoning="Tagged after review"))</code></pre>
 
       <h2 id="traversals">Read APIs (traversals)</h2>
       <table>
         <thead><tr><th>Method</th><th>Parameters</th><th>Returns</th></tr></thead>
         <tbody>
-          <tr><td><code class="method">entity_360</code></td><td><code>scope</code>, <code>anchor_label</code>, <code>anchor_id</code>, <code>max_depth=2</code></td><td><code>{"center", "connected"}</code></td></tr>
+          <tr><td><code class="method">entity_360</code></td><td><code>scope</code>, <code>anchor_label</code>, <code>anchor_id</code>, <code>max_depth=2</code></td><td><code>{"center", "connected"}</code>; each connected item includes <code>depth</code>, <code>edge_type</code>, <code>edge_properties</code></td></tr>
           <tr><td><code class="method">timeline</code></td><td><code>scope</code>, <code>entity_id</code>, <code>limit=50</code></td><td>Activity-style neighbours</td></tr>
           <tr><td><code class="method">pipeline</code></td><td><code>scope</code>, <code>stage=None</code>, <code>limit=100</code></td><td><code>list[NodeData]</code> deals</td></tr>
           <tr><td><code class="method">campaign_attribution</code></td><td><code>scope</code>, <code>deal_id=None</code>, <code>limit=100</code></td><td>Campaign–deal pairs</td></tr>
@@ -1181,7 +1204,7 @@ await db.close()</code></pre>
       <h3>Exported models</h3>
       <p><code>Lead</code>, <code>Account</code>, <code>Contact</code>, <code>Deal</code>, <code>Campaign</code>, <code>Entity</code>, <code>Relationship</code> — dataclasses with typed fields in the package today. The full surface area is described under <a href="#entity-roadmap">GTM entity model</a>.</p>
       <h3><code>NodeData</code> / <code>EdgeData</code></h3>
-      <p>Import from <code>crmdb.types</code>. <code>NodeData(label, id, tenant_id, properties)</code>; <code>EdgeData(type, from_id, to_id, properties={})</code>.</p>
+      <p>Import from <code>gtmdb.types</code>. <code>NodeData(label, id, tenant_id, properties)</code>; <code>EdgeData(type, from_id, to_id, properties={}, reasoning=None)</code>. The <code>reasoning</code> field is written to the relationship as property <code>reasoning</code> when non-empty (see <a href="#edge-reasoning">Relationship properties &amp; reasoning</a>).</p>
 
       <h2 id="seed">Seed demo data</h2>
       <pre><code>from crmdb import CrmDB, seed_sample_graph, create_token_from_presets, Scope
