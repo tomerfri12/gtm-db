@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gtmDB — API reference</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-dim: #388bfd66;
+      --ok: #3fb950;
+      --code-bg: #21262d;
+      --sidebar-w: 17rem;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Inter", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .layout { display: flex; min-height: 100vh; }
+    aside.doc-sidebar {
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
+      display: flex;
+      flex-direction: column;
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      max-height: 100vh;
+      overflow: hidden;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      transition: width 0.2s ease, min-width 0.2s ease;
+    }
+    aside.doc-sidebar.is-collapsed {
+      width: 2.75rem;
+      min-width: 2.75rem;
+    }
+    .sidebar-rail-toggle {
+      flex-shrink: 0;
+      align-self: flex-end;
+      margin: 0.35rem 0.65rem 0.25rem 0;
+      width: 2rem;
+      height: 2rem;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--code-bg);
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .sidebar-rail-toggle:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+    aside.doc-sidebar.is-collapsed .sidebar-rail-toggle {
+      align-self: center;
+      margin: 0.65rem 0 0.35rem;
+    }
+    .sidebar-body {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
+      padding: 0 0 1rem;
+      scrollbar-color: var(--border) transparent;
+    }
+    aside.doc-sidebar.is-collapsed .sidebar-body {
+      display: none;
+    }
+    .sidebar-body::-webkit-scrollbar { width: 8px; }
+    .sidebar-body::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+    .sidebar-body::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-brand {
+      padding: 0.35rem 0.85rem 1rem;
+      margin-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-brand a {
+      display: block;
+      line-height: 0;
+      text-decoration: none;
+    }
+    .sidebar-brand img.sidebar-logo {
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+    aside h1 {
+      margin: 0 1rem 0.85rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    aside nav details.nav-section {
+      margin-top: 0.85rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.35rem;
+    }
+    aside nav details.nav-section:first-of-type {
+      margin-top: 0;
+    }
+    aside nav details.nav-section:last-of-type {
+      border-bottom: none;
+    }
+    aside nav summary.nav-section-summary {
+      list-style: none;
+      cursor: pointer;
+      position: relative;
+      padding: 0.35rem 1rem 0.35rem 1.65rem;
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+      color: var(--muted);
+      opacity: 0.95;
+      user-select: none;
+    }
+    aside nav summary.nav-section-summary::-webkit-details-marker { display: none; }
+    aside nav summary.nav-section-summary::before {
+      content: "";
+      position: absolute;
+      left: 0.55rem;
+      top: 50%;
+      width: 0.4rem;
+      height: 0.4rem;
+      margin-top: -0.2rem;
+      border-right: 2px solid var(--muted);
+      border-bottom: 2px solid var(--muted);
+      transform: rotate(-45deg);
+      transition: transform 0.15s ease;
+      opacity: 0.85;
+    }
+    aside nav details.nav-section[open] summary.nav-section-summary::before {
+      transform: rotate(45deg);
+      margin-top: -0.28rem;
+    }
+    aside nav summary.nav-section-summary:hover {
+      color: var(--accent);
+    }
+    aside nav summary.nav-section-summary:hover::before {
+      border-color: var(--accent);
+    }
+    aside nav .nav-subgroup-label {
+      display: block;
+      padding: 0.55rem 1rem 0.15rem;
+      margin-top: 0.35rem;
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      opacity: 0.75;
+    }
+    aside nav ul.nav-nested {
+      list-style: none;
+      margin: 0;
+      padding: 0 0 0.2rem;
+    }
+    aside nav ul.nav-nested li { margin: 0; }
+    aside nav a {
+      display: block;
+      padding: 0.35rem 1rem;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      border-left: 2px solid transparent;
+    }
+    aside nav ul.nav-nested a {
+      padding-left: 1.6rem;
+      font-size: 12.5px;
+    }
+    aside nav a:hover { color: var(--accent); background: var(--accent-dim); }
+    aside nav a.active { color: var(--accent); border-left-color: var(--accent); }
+    main {
+      flex: 1;
+      padding: 2rem 2.5rem 4rem;
+      max-width: 52rem;
+    }
+    main > h2 {
+      margin: 2.25rem 0 0.75rem;
+      font-size: 1.35rem;
+      font-weight: 600;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    main > h2:first-of-type { margin-top: 0; }
+    h3 {
+      margin: 1.5rem 0 0.5rem;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    p { margin: 0.5rem 0 1rem; color: var(--muted); }
+    .lead { color: var(--text); font-size: 15px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.75rem 0 1.25rem;
+      font-size: 13px;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.5rem 0.65rem;
+      border: 1px solid var(--border);
+    }
+    th { background: var(--panel); color: var(--muted); font-weight: 600; }
+    td code { color: var(--ok); font-size: 12px; }
+    pre {
+      margin: 0.75rem 0 1.25rem;
+      padding: 1rem 1.1rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+    code { font-family: "JetBrains Mono", "SF Mono", Consolas, monospace; font-size: 12px; }
+    .badge {
+      display: inline-block;
+      padding: 0.12rem 0.45rem;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: var(--accent-dim);
+      color: var(--accent);
+      margin-left: 0.35rem;
+    }
+    .method { color: #d2a8ff; }
+    ul.params { margin: 0.25rem 0 1rem 1.25rem; color: var(--muted); font-size: 13px; }
+    footer {
+      margin-top: 3rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    @media (max-width: 860px) {
+      .layout { flex-direction: column; }
+      aside.doc-sidebar {
+        position: relative;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-height: none;
+        overflow: visible;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      aside.doc-sidebar.is-collapsed .sidebar-body {
+        display: block !important;
+      }
+      .sidebar-rail-toggle { display: none !important; }
+      .sidebar-body {
+        overflow: visible;
+        min-height: 0;
+      }
+      .sidebar-brand { text-align: center; }
+      .sidebar-brand img.sidebar-logo { max-width: 220px; margin: 0 auto; }
+      aside nav { display: flex; flex-wrap: wrap; gap: 0.25rem; padding: 0 0.5rem 0.5rem; }
+      aside nav details.nav-section {
+        flex: 1 1 100%;
+        margin-top: 0.5rem;
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+      aside nav details.nav-section:first-of-type { margin-top: 0; }
+      aside nav a { border-left: none; border-radius: 4px; }
+      aside nav ul.nav-nested a { padding-left: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside id="doc-sidebar" class="doc-sidebar">
+      <button type="button" class="sidebar-rail-toggle" id="sidebar-rail-toggle" aria-expanded="true" aria-controls="sidebar-body" title="Collapse sidebar" aria-label="Collapse sidebar">⟨</button>
+      <div id="sidebar-body" class="sidebar-body">
+      <div class="sidebar-brand">
+        <a href="#overview" title="gtmDB — API reference">
+          <img class="sidebar-logo" src="assets/gtm-db-logo.png" alt="gtmDB" />
+        </a>
+      </div>
+      <h1>API reference</h1>
+      <nav aria-label="Page sections">
+        <details class="nav-section" open>
+          <summary class="nav-section-summary">Introduction</summary>
+          <div class="nav-section-inner">
+          <a href="#overview">Overview</a>
+          <a href="#gtm-system-of-record">GTM system of record</a>
+          </div>
+        </details>
+        <details class="nav-section" open>
+          <summary class="nav-section-summary">Security</summary>
+          <div class="nav-section-inner">
+          <a href="#permissions">Overview</a>
+          <span class="nav-subgroup-label">Policy</span>
+          <a href="#policy-object">Policy object</a>
+          <a href="#policy-resources">Resources</a>
+          <a href="#policy-evaluation">Evaluation &amp; masking</a>
+          <span class="nav-subgroup-label">Tokens &amp; scope</span>
+          <a href="#policy-presets">Presets</a>
+          <a href="#access-token-model"><code>AccessToken</code></a>
+          <a href="#create-token-from-presets">Token builder</a>
+          <a href="#scope-api"><code>Scope</code> API</a>
+          <a href="#token-scope-example">Example flow</a>
+          <span class="nav-subgroup-label">Cookbook</span>
+          <a href="#permission-examples">Scenario examples - Agents & Human</a>
+          </div>
+        </details>
+        <details class="nav-section" open>
+          <summary class="nav-section-summary">Entities</summary>
+          <div class="nav-section-inner">
+          <ul class="nav-nested" aria-label="GTM entities">
+            <li><a href="#entity-crud">Entity API pattern</a></li>
+            <li><a href="#accounts">Account</a></li>
+            <li><a href="#contacts">Contact</a></li>
+            <li><a href="#leads">Lead</a></li>
+            <li><a href="#deals">Deal</a></li>
+            <li><a href="#campaigns">Campaign</a></li>
+            <li><a href="#entity-roadmap">GTM entity model</a></li>
+            <li><a href="#quotes">Quote</a></li>
+            <li><a href="#orders">Order</a></li>
+            <li><a href="#line-items">Line item</a></li>
+            <li><a href="#products">Product</a></li>
+            <li><a href="#subscriptions">Subscription</a></li>
+            <li><a href="#contracts">Contract</a></li>
+            <li><a href="#invoices">Invoice</a></li>
+            <li><a href="#partner-accounts">Partner account</a></li>
+            <li><a href="#quotas">Quota</a></li>
+            <li><a href="#territories">Territory</a></li>
+            <li><a href="#teams">Team</a></li>
+            <li><a href="#activities">Activity</a></li>
+            <li><a href="#emails">Email</a></li>
+            <li><a href="#calls">Call</a></li>
+            <li><a href="#meetings">Meeting</a></li>
+            <li><a href="#tasks">Task</a></li>
+            <li><a href="#notes">Note</a></li>
+            <li><a href="#chat-messages">Chat message</a></li>
+            <li><a href="#domain-events">Domain event</a></li>
+            <li><a href="#webinars">Webinar / session</a></li>
+            <li><a href="#form-submissions">Form submission</a></li>
+            <li><a href="#page-views">Page view</a></li>
+            <li><a href="#product-usage-events">Product usage</a></li>
+            <li><a href="#segments">Segment</a></li>
+            <li><a href="#marketing-lists">Marketing list</a></li>
+            <li><a href="#content-assets">Content asset</a></li>
+            <li><a href="#tickets">Ticket</a></li>
+            <li><a href="#health-scores">Health score</a></li>
+            <li><a href="#insights">Insight</a></li>
+            <li><a href="#metric-snapshots">Metric snapshot</a></li>
+            <li><a href="#reports-dashboards">Report / dashboard</a></li>
+            <li><a href="#forecasts">Forecast</a></li>
+            <li><a href="#attribution-touchpoints">Attribution touchpoint</a></li>
+          </ul>
+          </div>
+        </details>
+        <details class="nav-section" open>
+          <summary class="nav-section-summary">Graph &amp; queries</summary>
+          <div class="nav-section-inner">
+          <a href="#relationships">Relationships</a>
+          <a href="#low-level">Low-level</a>
+          <a href="#traversals">Traversals</a>
+          </div>
+        </details>
+        <details class="nav-section" open>
+          <summary class="nav-section-summary">Reference</summary>
+          <div class="nav-section-inner">
+          <a href="#types">Types &amp; config</a>
+          <a href="#seed">Seed</a>
+          </div>
+        </details>
+      </nav>
+      </div>
+    </aside>
+    <main>
+      <h2 id="overview">Overview — what is GTMDB?</h2>
+      <p class="lead">
+        <strong>GtmDB</strong> is the <strong>full-stack data layer</strong> built for the era of GTM autonomous
+        operations. While most agentic systems rely on scattered data and rigid tables without awareness of
+        permissions, GTMDB —backed by <strong>multi-model storage</strong>—provides agents exactly what they
+        need to make high-integrity, autonomous choices without exposing unnecessary information. Whether your agents
+        are built on <strong>OpenAI Frontier, Claude Cowork, or LangGraph </strong>, <strong>GtmDB</strong> provides them with secure access to
+        your business data, so they can run your business.
+      </p>
+      <h3>What GTMDB supports</h3>
+      <ol class="params" style="color: var(--text); margin-left: 1.25rem; padding-left: 0.5rem;">
+        <li style="margin-bottom: 0.85rem;">
+          <strong>One system of record for GTM—and the agents that use it.</strong> Typed CRUD and traversals
+          over the commercial graph—accounts through campaigns plus activities, comms, events, insights, and
+          operational stats in one <a href="#entity-roadmap">entity model</a>—so one store can back
+          <strong>MCP</strong> servers, LangChain-style tools, and bindings for common agent stacks
+          (<strong>LangGraph</strong>, <strong>Vertex AI</strong>, <strong>OpenClaw</strong>, and similar)
+          instead of every assistant re-wrapping a different partial API per system.
+        </li>
+        <li style="margin-bottom: 0.85rem;">
+          <strong>Security, permissions, and access out of the box — for people and for agents.</strong>
+          Every call runs under a <code>Scope</code> tied to declarative policies: tenant isolation,
+          read/write rules, field-level masking, and redaction. Issue different tokens for a human rep,
+          an internal agent, or an external partner so you <strong>control exactly what each principal
+          sees and can change</strong>.
+        </li>
+        <li style="margin-bottom: 0.85rem;">
+          <strong>Triggers and automation hooks.</strong> Design your stack so events in GTMDB drive
+          downstream behavior: e.g. <strong>trigger an agent when a deal closes</strong>, when a
+          <strong>campaign is sent</strong>, or when signals indicate <strong>learning</strong> or
+          coaching moments—closing the loop between CRM state and autonomous workflows.
+        </li>
+        <li style="margin-bottom: 0.85rem;">
+          <strong>Agents can ask anything — from facts, to analytical and statistical questions.</strong> The graph + indexed
+          analytical store model supports exploratory and quantitative questions over your pipeline and GTM motion:
+          strategic prompts (“<em>why are we losing to competitors?</em>” in context of your deals and
+          accounts) and statistical views (funnels, attribution, stage distributions) on top of the same
+          CRM-native store—not a separate BI silo.
+        </li>
+      </ol>
+      <h3 id="gtm-system-of-record">Sales, marketing &amp; customer success — one system of record</h3>
+      <p class="lead">
+        The entity model is deliberately <strong>cross-functional</strong>: the same graph holds what
+        <strong>marketing</strong>, <strong>sales</strong>, and <strong>customer success (CS)</strong> care
+        about, so GTMDB can serve as the <strong>ideal system of record for the whole revenue business</strong>
+        —not three disconnected spreadsheets or siloed tools.
+      </p>
+      <ul class="params" style="color: var(--text);">
+        <li><strong>Marketing</strong> — <code>Campaign</code>, <code>Lead</code>, segments and lists,
+          content and landing experiences, form and page-view events, attribution touchpoints, and links to
+          <code>Deal</code> (<code>INFLUENCED</code>). Full-text search over accounts and programs; pipeline
+          visibility stays tied to the same graph sales uses.</li>
+        <li><strong>Sales</strong> — <code>Account</code> / <code>Contact</code> hierarchy, <code>Deal</code>,
+          quotes, orders, products, contracts, comms (email, call, meeting), tasks, and partner
+          accounts—plus traversals (360°, path-finding) for account planning and multi-threading.</li>
+        <li><strong>Customer success &amp; support</strong> — Tickets, SLAs, health scores, renewal context
+          on the same <code>Account</code> graph as sales; timeline from emails, meetings, usage events, and
+          notes so CS, sales, and marketing share one customer truth.</li>
+        <li><strong>RevOps &amp; leadership</strong> — Metric snapshots, forecasts, dashboards/reports, and
+          AI or rule-driven <strong>insights</strong> materialized on top of the same store—no shadow warehouse
+          required for operational GTM questions.</li>
+      </ul>
+      <p>
+        Because every department reads and writes through the <strong>same CRM-native API</strong> under
+        <code>Scope</code>, you avoid duplicate “shadow” CRMs: one store, one permission model, one place
+        agents and humans query when they need the full picture of a customer or campaign.
+      </p>
+      <p>
+        Under the hood, GTMDB stores CRM entities as <strong>nodes and relationships</strong> in
+        <strong>Neo4j</strong> (labels such as <code>Lead</code>, <code>Account</code>, <code>Deal</code>,
+        etc.). That choice enables graph traversals (360° views, timelines, attribution paths, search).
+        Applications integrate through the <code>CrmDB</code> client; optional <strong>SQLAlchemy
+        metadata</strong> defines an <code>AccessToken</code> table so you can persist issued tokens in
+        your app database (CRM2 does this); the token row holds JSON policies that drive authorization.
+      </p>
+      <h3>What this library includes</h3>
+      <ul class="params" style="color: var(--text);">
+        <li><strong><code>CrmDB</code></strong> — async entrypoint: <code>connect</code> / <code>close</code>, typed sub-APIs (<code>leads</code>, <code>accounts</code>, <code>contacts</code>, <code>deals</code>, <code>campaigns</code>, <code>emails</code>, <code>email_campaigns</code>), <code>relationships</code>, low-level <code>NodeData</code>/<code>EdgeData</code>, and read helpers (<code>search</code>, <code>pipeline</code>, <code>entity_360</code>, …).</li>
+        <li><strong>Typed entity layer</strong> — dataclasses (<code>Lead</code>, <code>Account</code>, …) and CRUD with filtering, updates, and convenience methods (e.g. <code>assign_to_account</code>, <code>link_campaign</code>, <code>link_deal</code>).</li>
+        <li><strong><code>Scope</code></strong> — evaluates JSON <em>policies</em> for every operation: read/write on node labels and relationship types, optional per-record <code>ids</code> scoping, field-level <strong>masking</strong> (denylist / allowlist), and <strong>redaction</strong> when a row exists but must not be fully revealed.</li>
+        <li><strong><code>AccessToken</code></strong> — SQLAlchemy model: <code>tenant_id</code>, <code>owner_id</code>, <code>owner_type</code>, <code>policies</code> (JSON string), <code>redact_mode</code>, <code>label</code>, <code>is_active</code>, timestamps.</li>
+        <li><strong><code>create_token_from_presets</code> + <code>PRESETS</code></strong> — compose tokens from named policy bundles (<code>full_access</code>, <code>read_all</code>, <code>write_all</code>, <code>no_raw_content</code>) plus optional <code>custom_presets</code> and <code>extra_policies</code>.</li>
+        <li><strong>Schema bootstrap</strong> — idempotent Neo4j constraints, indexes, and full-text index for entity search (run on <code>connect()</code>).</li>
+        <li><strong><code>seed_sample_graph</code></strong> — demo data for tests and local development.</li>
+        <li><strong><code>CrmdbSettings</code></strong> — Pydantic settings with <code>CRMDB_</code> env prefix for Neo4j URI and credentials.</li>
+      </ul>
+      <p>
+        Every API method that touches data requires a <code>Scope</code> derived from a token. The same
+        code path enforces <strong>tenant isolation</strong> (<code>tenant_id</code> on the token is applied
+        to queries and writes) and <strong>authorization</strong> (policies). There is no “admin bypass”
+        inside the library—use a token whose policies match the intended privilege level.
+      </p>
+
+      <h2 id="entity-crud">Entity API pattern <span class="badge">CRUD</span></h2>
+      <p>
+        The <strong>unified GTM record</strong> spans companies (<code>Account</code>), people
+        (<code>Contact</code>), prospects (<code>Lead</code>), opportunities (<code>Deal</code>), programs
+        (<code>Campaign</code>, <code>EmailCampaign</code>, <code>Email</code>), and the wider types in <a href="#entity-roadmap">GTM entity model</a>—all
+        linkable in one graph. The sections below use the shared <code>create</code> /
+        <code>get</code> / <code>list</code> / <code>update</code> / <code>delete</code> pattern; examples pass
+        a <code>scope</code> argument. Build a <code>Scope</code> from an access token as described under
+        <a href="#permissions">Permissions, scopes &amp; access tokens</a> (later on this page). Additional
+        types evolve on the same contracts (schema, <code>Scope</code>, relationships)—including via
+        <a href="#low-level">low-level nodes and edges</a> when you prototype ahead of generated clients.
+      </p>
+
+      <h3 id="connect">Connect &amp; disconnect</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Parameters</th><th>Returns</th></tr></thead>
+        <tbody>
+          <tr><td><code class="method">connect()</code></td><td>—</td><td><code>None</code> — verifies backend, bootstraps schema</td></tr>
+          <tr><td><code class="method">close()</code></td><td>—</td><td><code>None</code></td></tr>
+        </tbody>
+      </table>
+      <pre><code>from crmdb import CrmDB, CrmdbSettings
+
+settings = CrmdbSettings()  # env: CRMDB_NEO4J_URI, CRMDB_NEO4J_USER, CRMDB_NEO4J_PASSWORD
+db = CrmDB(settings)
+await db.connect()
+# ... use db ...
+await db.close()</code></pre>
+
+      <p>Each of <code>db.leads</code>, <code>db.accounts</code>, <code>db.contacts</code>, <code>db.deals</code>, <code>db.campaigns</code>, <code>db.emails</code>, <code>db.email_campaigns</code> implements:</p>
+      <table>
+        <thead><tr><th>Method</th><th>Parameters</th><th>Returns / notes</th></tr></thead>
+        <tbody>
+          <tr><td><code class="method">create</code></td><td><code>scope</code>, <strong>**kwargs</strong> domain fields</td><td>Typed entity; <code>id</code>, <code>tenant_id</code>, timestamps set automatically</td></tr>
+          <tr><td><code class="method">get</code></td><td><code>scope</code>, <code>entity_id: str</code></td><td>Entity or <code>None</code></td></tr>
+          <tr><td><code class="method">list</code></td><td><code>scope</code>, <code>limit=50</code>, <code>offset=0</code>, <strong>**filters</strong> (equality on domain fields)</td><td><code>list</code> of entities</td></tr>
+          <tr><td><code class="method">update</code></td><td><code>scope</code>, <code>entity_id</code>, <strong>**kwargs</strong> (PATCH)</td><td>Entity or <code>None</code>; sets <code>updated_at</code></td></tr>
+          <tr><td><code class="method">delete</code></td><td><code>scope</code>, <code>entity_id</code></td><td><code>bool</code> — removed</td></tr>
+        </tbody>
+      </table>
+      <pre><code>lead = await db.leads.create(
+    scope,
+    company_name="Acme",
+    first_name="Jane",
+    status="new",
+)
+row = await db.leads.get(scope, lead.id)
+rows = await db.leads.list(scope, status="new", limit=20)
+await db.leads.update(scope, lead.id, status="qualified")
+await db.leads.delete(scope, lead.id)</code></pre>
+
+      <h2 id="accounts">Account <code>db.accounts</code></h2>
+      <p>
+        An <strong>Account</strong> is a <em>company or organization</em> you sell to: the canonical B2B
+        “customer record.” It holds firmographic attributes (name, domain, industry, size, revenue).
+        People (<strong>Contacts</strong>) and open opportunities (<strong>Deals</strong>) are linked
+        <em>to</em> an account via relationships, not duplicated inside the account row.
+      </p>
+      <p><strong>Python type:</strong> <code>from crmdb import Account</code> — dataclass with
+        <code>id</code>, <code>tenant_id</code>, <code>created_at</code>, <code>updated_at</code>, plus
+        <code>name</code>, <code>domain</code>, <code>industry</code>, <code>employee_count</code>,
+        <code>annual_revenue</code>, <code>website</code>, <code>type</code> (e.g. prospect vs customer).
+      </p>
+      <p><strong>API surface:</strong> standard CRUD only — <code>create</code>, <code>get</code>,
+        <code>list</code>, <code>update</code>, <code>delete</code>. There are no extra methods on
+        <code>AccountsAPI</code>; use <code>db.contacts.for_account</code> / <code>db.deals.for_account</code>
+        to query who works there and which deals belong to the account.
+      </p>
+      <pre><code>from crmdb import Account, CrmDB, Scope
+
+# scope = Scope(token)  # see #permissions
+acc = await db.accounts.create(
+    scope,
+    name="Acme Industries",
+    domain="acme.example",
+    industry="Software",
+    employee_count=120,
+    type="customer",
+)
+# acc.id is assigned by GTMDB — store it for linking contacts/deals
+
+loaded: Account | None = await db.accounts.get(scope, acc.id)
+same_tenant = await db.accounts.list(scope, domain="acme.example", limit=10)
+
+await db.accounts.update(scope, acc.id, annual_revenue=5_000_000.0)
+removed = await db.accounts.delete(scope, acc.id)  # bool</code></pre>
+
+      <h2 id="contacts">Contact <code>db.contacts</code></h2>
+      <p>
+        A <strong>Contact</strong> is a <em>person</em>: name, email, title, and optional company string
+        or department. In the graph model, a contact is linked to exactly one <strong>Account</strong>
+        (typical pattern) via <code>WORKS_AT</code> using <code>assign_to_account</code>. Use
+        <code>for_account</code> to list everyone at a company.
+      </p>
+      <p><strong>Python type:</strong> <code>from crmdb import Contact</code> —
+        <code>first_name</code>, <code>last_name</code>, <code>email</code>, <code>phone</code>,
+        <code>title</code>, <code>company_name</code>, <code>department</code>, <code>linkedin_url</code>,
+        plus system fields on <code>Entity</code>.
+      </p>
+      <p><strong>Extra methods:</strong> <code>assign_to_account(scope, contact_id, account_id)</code>,
+        <code>for_account(scope, account_id, limit=50)</code>.
+      </p>
+      <pre><code>from crmdb import Contact, CrmDB, Scope
+
+person = await db.contacts.create(
+    scope,
+    first_name="Jane",
+    last_name="Doe",
+    email="jane@acme.example",
+    title="VP Sales",
+    company_name="Acme Industries",
+)
+await db.contacts.assign_to_account(scope, person.id, acc.id)
+
+team: list[Contact] = await db.contacts.for_account(scope, acc.id, limit=100)
+one = await db.contacts.get(scope, person.id)
+await db.contacts.update(scope, person.id, department="Revenue")
+await db.contacts.delete(scope, person.id)</code></pre>
+
+      <h2 id="leads">Lead <code>db.leads</code></h2>
+      <p>
+        A <strong>Lead</strong> is a <em>prospect</em> not yet fully qualified as a contact/opportunity:
+        often from inbound forms, ads, or research. Fields mirror a lightweight person+company record
+        plus <code>status</code> (e.g. <code>new</code>, <code>qualified</code>) and optional
+        <code>source</code> / <code>score</code>. Link a lead to an account with
+        <code>assign_to_account</code> when you identify the company; use <code>for_account</code> to
+        list leads tied to that account. Link a lead to a <strong>Campaign</strong> with
+        <code>link_campaign</code> (<code>SOURCED_FROM</code> lead → campaign) for MQL / program attribution.
+      </p>
+      <p><strong>Python type:</strong> <code>from crmdb import Lead</code> —
+        <code>company_name</code>, <code>first_name</code>, <code>last_name</code>, <code>email</code>,
+        <code>phone</code>, <code>title</code>, <code>domain</code>, <code>status</code>,
+        <code>source</code>, <code>score</code>, <code>linkedin_url</code>.
+      </p>
+      <p><strong>Extra methods:</strong> <code>assign_to_account</code>, <code>for_account</code>
+        (same pattern as contacts; relationship type <code>WORKS_AT</code> lead → account);
+        <code>link_campaign(scope, lead_id, campaign_id)</code> — <code>SOURCED_FROM</code> lead → campaign.
+      </p>
+      <pre><code>from crmdb import Lead, CrmDB, Scope
+
+prospect = await db.leads.create(
+    scope,
+    company_name="Beta Corp",
+    first_name="Sam",
+    last_name="Lee",
+    status="new",
+    source="webinar",
+    score=42.0,
+)
+await db.leads.assign_to_account(scope, prospect.id, acc.id)
+cmp = await db.campaigns.create(scope, name="Webinar series", channel="webinar")
+await db.leads.link_campaign(scope, prospect.id, cmp.id)
+
+queue = await db.leads.list(scope, status="new", limit=50, offset=0)
+await db.leads.update(scope, prospect.id, status="qualified")
+await db.leads.delete(scope, prospect.id)</code></pre>
+
+      <h2 id="deals">Deal <code>db.deals</code></h2>
+      <p>
+        A <strong>Deal</strong> is a <em>sales opportunity</em>: amount, stage, probability, optional
+        close date and owner. Attach it to an <strong>Account</strong> with <code>assign_to_account</code>
+        (<code>BELONGS_TO</code>). Link <strong>Contacts</strong> involved via <code>add_contact</code>
+        (<code>HAS_CONTACT</code>). Link a <strong>Campaign</strong> with <code>add_campaign</code> or
+        <code>campaigns.link_deal</code> for attribution (<code>INFLUENCED</code>).
+      </p>
+      <p><strong>Python type:</strong> <code>from crmdb import Deal</code> —
+        <code>name</code>, <code>amount</code>, <code>stage</code>, <code>probability</code>,
+        <code>close_date</code>, <code>description</code>, <code>owner_id</code>.
+      </p>
+      <pre><code>from crmdb import Deal, CrmDB, Scope
+
+opp = await db.deals.create(
+    scope,
+    name="Acme — Enterprise renewal",
+    amount=120_000,
+    stage="negotiation",
+    probability=0.7,
+    close_date="2026-06-30",
+    owner_id="rep-42",
+)
+await db.deals.assign_to_account(scope, opp.id, acc.id)
+await db.deals.add_contact(scope, opp.id, person.id)
+
+open_at_acme: list[Deal] = await db.deals.for_account(scope, acc.id)
+await db.deals.update(scope, opp.id, stage="closed_won")
+await db.deals.delete(scope, opp.id)</code></pre>
+      <table>
+        <thead><tr><th>Method</th><th>Parameters</th><th>Edge</th></tr></thead>
+        <tbody>
+          <tr><td><code class="method">assign_to_account</code></td><td><code>scope</code>, <code>deal_id</code>, <code>account_id</code></td><td><code>BELONGS_TO</code> deal → account</td></tr>
+          <tr><td><code class="method">add_contact</code></td><td><code>scope</code>, <code>deal_id</code>, <code>contact_id</code></td><td><code>HAS_CONTACT</code></td></tr>
+          <tr><td><code class="method">add_campaign</code></td><td><code>scope</code>, <code>deal_id</code>, <code>campaign_id</code></td><td><code>INFLUENCED</code> (campaign → deal)</td></tr>
+          <tr><td><code class="method">for_account</code></td><td><code>scope</code>, <code>account_id</code>, <code>limit=50</code></td><td>query helper</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="campaigns">Campaign <code>db.campaigns</code></h2>
+      <p>
+        A <strong>Campaign</strong> is a <em>marketing program</em> (channel, budget, dates, status).
+        Tie <strong>leads</strong> to a generic campaign with <code>db.leads.link_campaign</code> (<code>SOURCED_FROM</code>).
+        For <strong>email programs</strong> with sequenced messages, use <a href="#email-campaigns"><code>db.email_campaigns</code></a> and <code>create_with_artifacts</code> instead.
+        Tie it to <strong>deals</strong> using <code>link_deal</code> so attribution queries (e.g.
+        <code>db.campaign_attribution</code>) can see which deals were influenced.
+      </p>
+      <p><strong>Python type:</strong> <code>from crmdb import Campaign</code> —
+        <code>name</code>, <code>status</code>, <code>channel</code>, <code>budget</code>,
+        <code>start_date</code>, <code>end_date</code>, <code>description</code>.
+      </p>
+      <pre><code>from crmdb import Campaign, CrmDB, Scope
+
+cmp = await db.campaigns.create(
+    scope,
+    name="Q1 Outbound",
+    status="active",
+    channel="email",
+    budget=25_000,
+)
+await db.campaigns.link_deal(scope, cmp.id, opp.id)  # opp = existing Deal
+
+influenced = await db.campaigns.influenced_deals(scope, cmp.id, limit=20)
+# list of {"deal": Deal}
+await db.campaigns.delete(scope, cmp.id)</code></pre>
+      <table>
+        <thead><tr><th>Method</th><th>Parameters</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code class="method">link_deal</code></td><td><code>scope</code>, <code>campaign_id</code>, <code>deal_id</code></td><td><code>INFLUENCED</code> campaign → deal</td></tr>
+          <tr><td><code class="method">influenced_deals</code></td><td><code>scope</code>, <code>campaign_id</code>, <code>limit=50</code></td><td><code>list[dict]</code> with <code>{"deal": Deal}</code></td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="email-campaigns">EmailCampaign <code>db.email_campaigns</code></h2>
+      <p>
+        An <strong>EmailCampaign</strong> is a marketing program specialized for email: it inherits all
+        <code>Campaign</code> fields (<code>name</code>, <code>status</code>, <code>channel</code> forced to
+        <code>email</code> on <code>create_with_artifacts</code>, <code>budget</code>, dates, <code>description</code>) plus
+        <code>from_name</code>, <code>from_email</code>, and <code>reply_to</code> for the sending identity.
+        Graph label <code>EmailCampaign</code>. Lives in <code>crmdb.api.communication_events</code>.
+      </p>
+      <p>
+        Use <code class="method">create_with_artifacts</code> to persist the campaign node, one <code>Email</code> node per
+        artifact, <code>HAS_EMAIL</code> edges (email campaign → email), and optional
+        <code>SOURCED_FROM</code> edges from <code>Lead</code> ids to the email campaign (same pattern as
+        <code>db.leads.link_campaign</code> for generic <code>Campaign</code> nodes).
+      </p>
+      <pre><code>from crmdb import CrmDB, Scope
+
+out = await db.email_campaigns.create_with_artifacts(
+    scope,
+    name="Q1 Nurture",
+    from_name="Marketing",
+    from_email="mkt@example.com",
+    emails=[
+        {"subject": "Hello", "body": "First touch"},
+        {"subject": "Follow up", "body": "Second touch"},
+    ],
+    lead_ids=["uuid-of-existing-lead"],  # optional
+)
+ec = out["campaign"]
+# out["email_ids"], out["linked_lead_count"]</code></pre>
+      <table>
+        <thead><tr><th>Method</th><th>Parameters</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code class="method">create_with_artifacts</code></td><td><code>scope</code>, <code>emails</code> (list of dicts), optional <code>lead_ids</code>, plus EmailCampaign domain kwargs (<code>name</code>, …)</td><td>Persist <code>EmailCampaign</code> + <code>Email</code>s + <code>HAS_EMAIL</code>; optional <code>SOURCED_FROM</code> from leads (does not send mail)</td></tr>
+          <tr><td colspan="3">Also standard <code>create</code> / <code>get</code> / <code>list</code> / <code>update</code> / <code>delete</code> from the entity pattern.</td></tr>
+        </tbody>
+      </table>
+      <p>
+        Tokens need <code>write</code> on labels <code>EmailCampaign</code> and <code>Email</code>, and on
+        relationship types <code>HAS_EMAIL</code> and <code>SOURCED_FROM</code> (e.g. <code>full_access</code> with <code>resources: ["*"]</code>).
+      </p>
+
+      <h2 id="emails">Email <code>db.emails</code></h2>
+      <p>
+        An <strong>Email</strong> node stores a single email artifact (sequence step, draft, or send record):
+        <code>subject</code>, <code>body</code>, optional per-message <code>from_name</code> /
+        <code>from_email</code> / <code>reply_to</code>, <code>state</code> (e.g. <code>draft</code>),
+        <code>sequence_number</code>, <code>send_at</code>. Full CRUD via <code>db.emails</code>; batch attach
+        to a program via <code>db.email_campaigns.create_with_artifacts</code>. For HubSpot-style marketing email fields
+        (content widgets, subscription lists, A/B testing), see
+        <a href="https://developers.hubspot.com/docs/api-reference/marketing-marketing-emails-v3/marketing-emails/post-marketing-v3-emails">HubSpot Marketing Emails API</a> as a reference for future extensions.
+      </p>
+
+      <h3>End-to-end: account → contact → deal</h3>
+      <p>Typical order: create <strong>Account</strong>, then <strong>Contact</strong> and
+        <code>assign_to_account</code>, then <strong>Deal</strong>, <code>assign_to_account</code> on the
+        deal, and <code>add_contact</code> on the deal.</p>
+      <pre><code>acc = await db.accounts.create(scope, name="Acme", domain="acme.example")
+c = await db.contacts.create(scope, first_name="Jane", last_name="Doe", email="j@acme.example")
+await db.contacts.assign_to_account(scope, c.id, acc.id)
+d = await db.deals.create(scope, name="Acme expansion", amount=50_000, stage="qualification")
+await db.deals.assign_to_account(scope, d.id, acc.id)
+await db.deals.add_contact(scope, d.id, c.id)</code></pre>
+
+      <h2 id="entity-roadmap">GTM entity model</h2>
+      <p class="lead">
+        GTMDB is intended to subsume the <strong>entire revenue operating model</strong>: not only accounts
+        and deals, but everything that happens around them—conversations, campaigns, product signals,
+        support, and the metrics and narratives you derive from that activity. The types below share the same
+        design language as the CRUD sections: naming, relationships, and typical links to
+        <code>Account</code>, <code>Contact</code>, <code>Deal</code>, and related nodes. Typed
+        <code>db.*</code> entrypoints roll out over time; until one exists for a label, you can model it with
+        <a href="#low-level">low-level nodes and edges</a> under <code>Scope</code>.
+      </p>
+
+      <h3 id="quotes">Quote</h3>
+      <p>Formal commercial offer: line items, pricing, validity, status (draft/sent/accepted/lost). Links to <code>Account</code>, <code>Contact</code>, and typically one or more <code>Deal</code>s.</p>
+
+      <h3 id="orders">Order</h3>
+      <p>Won business captured as a transaction: totals, billing/shipping refs, fulfillment state. Links from <code>Quote</code> or <code>Deal</code>, to <code>Account</code> and <code>Line item</code> rows.</p>
+
+      <h3 id="line-items">Line item</h3>
+      <p>Atomic row on a quote or order: <code>Product</code> reference, quantity, unit price, discounts. Enables revenue, margin, and product-mix reporting without denormalizing headers.</p>
+
+      <h3 id="products">Product</h3>
+      <p>SKU or sellable item: name, family, price book hooks, entitlements. Connects quotes, orders, and <strong>product usage</strong> events for adoption and expansion signals.</p>
+
+      <h3 id="subscriptions">Subscription</h3>
+      <p>Recurring commercial relationship: term, seat count, MRR/ARR rollups, renewal dates. Bridges <code>Account</code>, <code>Contract</code>, and billing <code>Invoice</code>s.</p>
+
+      <h3 id="contracts">Contract</h3>
+      <p>Legal or commercial agreement: effective dates, auto-renew, governing terms. Anchors <code>Subscription</code> and renewal workflows for sales and CS.</p>
+
+      <h3 id="invoices">Invoice</h3>
+      <p>Money owed or collected: amounts, due dates, payment status, sync ids from finance systems. Links to <code>Order</code> / <code>Subscription</code> and <code>Account</code>.</p>
+
+      <h3 id="partner-accounts">Partner account</h3>
+      <p>Channel, reseller, or tech partner org: tiers, MDF, co-sell flags. Relates to <code>Account</code> (customer) and <code>Deal</code> for partner-sourced pipeline.</p>
+
+      <h3 id="quotas">Quota</h3>
+      <p>Target envelope for a rep, team, or product line: period, amount or ARR goal, attainment rollups. Anchors <code>Forecast</code> and pipeline views without spreadsheet exports.</p>
+
+      <h3 id="territories">Territory</h3>
+      <p>Routing and ownership rules over accounts or geos: named coverage, assignment policy, overlap handling. Links to <code>Team</code> rosters and <code>Account</code> for fair distribution and reporting.</p>
+
+      <h3 id="teams">Team</h3>
+      <p>Sales or CS pod: members, manager hierarchy, cost center, named coverage of <code>Territory</code>. Used for forecasts, quotas, and “who owns this account” rollups.</p>
+
+      <h3 id="activities">Activity</h3>
+      <p>Generic timeline row (subject, time, owner, type) that can normalize or wrap emails, calls, meetings, tasks—so <code>timeline</code>-style APIs have a single polymorphic backbone.</p>
+
+      <h3 id="emails">Email</h3>
+      <p>Message metadata and body refs: direction, thread id, participants mapped to <code>Contact</code>, engagement signals. Feeds sequences, compliance, and conversation intelligence.</p>
+
+      <h3 id="calls">Call</h3>
+      <p>Voice or video touchpoint: duration, disposition, recording/transcript refs, attendees. Links to <code>Account</code>, <code>Deal</code>, and <code>Contact</code>.</p>
+
+      <h3 id="meetings">Meeting</h3>
+      <p>Scheduled or completed calendar event: time, location/link, internal vs external attendees. Core to sales motion and CS QBRs.</p>
+
+      <h3 id="tasks">Task</h3>
+      <p>Owned follow-up: due date, priority, queue, completion. Relates to any anchor (<code>Deal</code>, <code>Ticket</code>, <code>Account</code>).</p>
+
+      <h3 id="notes">Note</h3>
+      <p>Free-text capture with author and visibility; often child of <code>Account</code>, <code>Contact</code>, or <code>Deal</code> for handoffs and audit.</p>
+
+      <h3 id="chat-messages">Chat message</h3>
+      <p>In-app, Slack, or support-chat utterances: channel, sender, thread. Complements <code>Email</code> for full conversational context.</p>
+
+      <h3 id="domain-events">Domain event</h3>
+      <p>Immutable <strong>something happened</strong> record: type, payload, occurred_at, correlation id, source system. Backplane for automation, analytics, and replay—distinct from CRM “state” rows.</p>
+
+      <h3 id="webinars">Webinar / session</h3>
+      <p>Hosted or sponsored session: registration list, attendance, recording. Links to <code>Campaign</code>, <code>Lead</code>, and <code>Contact</code> for demand gen attribution.</p>
+
+      <h3 id="form-submissions">Form submission</h3>
+      <p>Inbound capture event: form id, UTM, field payload, consent flags. Spawns or updates <code>Lead</code> and ties to <code>Page view</code> sequences.</p>
+
+      <h3 id="page-views">Page view</h3>
+      <p>Anonymous or identified web/app surface hit: path, session, referrer. Supports digital body language and scoring before a known <code>Contact</code> exists.</p>
+
+      <h3 id="product-usage-events">Product usage event</h3>
+      <p>In-product telemetry: feature, volume, account/user id, timestamp. Drives adoption metrics, PQLs, and CS health without a separate product-analytics silo.</p>
+
+      <h3 id="segments">Segment</h3>
+      <p>Named audience definition (rule or list membership) over people or accounts. Powers campaigns, sales prioritization, and agent “who to reach” tools.</p>
+
+      <h3 id="marketing-lists">Marketing list</h3>
+      <p>Static or synced recipient set for a send or experiment; links to <code>Campaign</code> and <code>Segment</code>.</p>
+
+      <h3 id="content-assets">Content asset</h3>
+      <p>Collateral with metadata: ebook, deck, demo clip, landing URL. Tracks engagement via events and ties to <code>Campaign</code> and <code>Deal</code> enablement.</p>
+
+      <h3 id="tickets">Ticket</h3>
+      <p>Support or success case: priority, status, SLA clock, category. Links to <code>Account</code>, <code>Contact</code>, and optionally <code>Deal</code> / <code>Subscription</code>.</p>
+
+      <h3 id="health-scores">Health score</h3>
+      <p>Time-stamped snapshot of account or subscription health: dimensions (usage, support load, NPS), composite score, explainability refs. Distinct from ad-hoc <code>Insight</code> text.</p>
+
+      <h3 id="insights">Insight</h3>
+      <p>Machine- or human-authored finding: summary, severity, evidence pointers (entities, events, metrics), recommended action. Suitable for agent surfacing and review queues.</p>
+
+      <h3 id="metric-snapshots">Metric snapshot</h3>
+      <p>Materialized <strong>stat</strong> at a grain (e.g. daily pipeline by stage, campaign ROI, seat utilization): measure name, dimensions, value, period. Feeds dashboards without re-scanning raw events every time.</p>
+
+      <h3 id="reports-dashboards">Report / dashboard</h3>
+      <p>Saved analytical view: definition (query spec or widget layout), owner, refresh policy. Optional export to BI; first-class in GTMDB for in-product revops.</p>
+
+      <h3 id="forecasts">Forecast</h3>
+      <p>Rep, team, or exec projection: category (commit/best case), period, amount, override trail. Anchored to <code>Deal</code> rollups and <code>Quota</code> targets.</p>
+
+      <h3 id="attribution-touchpoints">Attribution touchpoint</h3>
+      <p>Granular credit-bearing interaction on the path to opportunity: channel, campaign/content ref, weight model. Complements graph edges like <code>INFLUENCED</code> with multi-touch detail.</p>
+
+      <h2 id="relationships">Relationships <code>db.relationships</code></h2>
+      <table>
+        <thead><tr><th>Method</th><th>Parameters</th><th>Returns</th></tr></thead>
+        <tbody>
+          <tr><td><code class="method">create</code></td><td><code>scope</code>, <code>from_id</code>, <code>rel_type</code>, <code>to_id</code>, <strong>**props</strong></td><td><code>Relationship</code></td></tr>
+          <tr><td><code class="method">list</code></td><td><code>scope</code>, <code>node_id</code>, <code>rel_type=None</code>, <code>direction="both"</code> (<code>out</code>|<code>in</code>|<code>both</code>), <code>limit=100</code></td><td><code>list[Relationship]</code></td></tr>
+          <tr><td><code class="method">delete</code></td><td><code>scope</code>, <code>from_id</code>, <code>rel_type</code>, <code>to_id</code></td><td><code>bool</code></td></tr>
+        </tbody>
+      </table>
+      <pre><code>await db.relationships.create(scope, lead_id, "WORKS_AT", account_id)
+rels = await db.relationships.list(scope, node_id, rel_type="WORKS_AT", direction="out")
+await db.relationships.delete(scope, lead_id, "WORKS_AT", account_id)</code></pre>
+
+      <h2 id="low-level">Low-level <code>CrmDB</code></h2>
+      <table>
+        <thead><tr><th>Method</th><th>Parameters</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code class="method">create_node</code></td><td><code>scope</code>, <code>node: NodeData</code></td><td>Arbitrary label + properties</td></tr>
+          <tr><td><code class="method">create_edge</code></td><td><code>scope</code>, <code>edge: EdgeData</code></td><td><code>type</code>, <code>from_id</code>, <code>to_id</code>, optional <code>properties</code></td></tr>
+          <tr><td><code class="method">get_node</code></td><td><code>scope</code>, <code>label</code>, <code>node_id</code></td><td><code>NodeData | None</code></td></tr>
+          <tr><td><code class="method">get_neighbors</code></td><td><code>scope</code>, <code>node_id</code>, <code>edge_types=None</code>, <code>direction="both"</code></td><td>List of dicts with <code>node</code>, <code>edge_type</code></td></tr>
+          <tr><td><code class="method">execute_cypher</code></td><td><code>scope</code>, <code>query: str</code>, <code>params=None</code></td><td>Injects <code>tenant_id</code>; use with care</td></tr>
+        </tbody>
+      </table>
+      <pre><code>from crmdb.types import NodeData, EdgeData
+
+node = await db.create_node(scope, NodeData("Tag", "", "", {"name": "hot"}))
+edge = await db.create_edge(scope, EdgeData("TAGGED", from_id, to_id))</code></pre>
+
+      <h2 id="traversals">Read APIs (traversals)</h2>
+      <table>
+        <thead><tr><th>Method</th><th>Parameters</th><th>Returns</th></tr></thead>
+        <tbody>
+          <tr><td><code class="method">entity_360</code></td><td><code>scope</code>, <code>anchor_label</code>, <code>anchor_id</code>, <code>max_depth=2</code></td><td><code>{"center", "connected"}</code></td></tr>
+          <tr><td><code class="method">timeline</code></td><td><code>scope</code>, <code>entity_id</code>, <code>limit=50</code></td><td>Activity-style neighbours</td></tr>
+          <tr><td><code class="method">pipeline</code></td><td><code>scope</code>, <code>stage=None</code>, <code>limit=100</code></td><td><code>list[NodeData]</code> deals</td></tr>
+          <tr><td><code class="method">campaign_attribution</code></td><td><code>scope</code>, <code>deal_id=None</code>, <code>limit=100</code></td><td>Campaign–deal pairs</td></tr>
+          <tr><td><code class="method">path_finding</code></td><td><code>scope</code>, <code>from_id</code>, <code>to_id</code>, <code>max_hops=15</code></td><td>Shortest path or <code>None</code></td></tr>
+          <tr><td><code class="method">search</code></td><td><code>scope</code>, <code>query</code>, <code>limit=25</code></td><td>Full-text hits (masked)</td></tr>
+        </tbody>
+      </table>
+      <pre><code>hits = await db.search(scope, "acme", limit=10)
+deals = await db.pipeline(scope, stage="negotiation")
+ctx = await db.entity_360(scope, "Account", account_id, max_depth=2)</code></pre>
+
+      <h2 id="permissions">Permissions, scopes &amp; access tokens</h2>
+      <p class="lead">
+        Authorization is <strong>declarative</strong>: you attach a JSON list of <em>policy objects</em> to
+        an <code>AccessToken</code>, then wrap that token in a <code>Scope</code>. The graph adapter consults
+        the scope on <strong>every</strong> read and write (nodes, edges, traversals, raw Cypher executed
+        through the client).
+      </p>
+
+      <h3 id="policy-object">Policy object shape</h3>
+      <p>Each policy is a dict. Typical fields:</p>
+      <table>
+        <thead><tr><th>Key</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>effect</code></td><td><code>"allow"</code> or <code>"deny"</code></td></tr>
+          <tr><td><code>actions</code></td><td>List including <code>"read"</code> and/or <code>"write"</code></td></tr>
+          <tr><td><code>resources</code></td><td>List of resource strings (see below)</td></tr>
+          <tr><td><code>conditions</code></td><td>Optional dict; supported: <code>ids</code> — list of record ids for instance-level rules</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="policy-resources">Resource strings</h3>
+      <ul class="params">
+        <li><code>"*"</code> — matches any resource (whole types).</li>
+        <li><code>"Lead"</code>, <code>"Deal"</code>, … — node <strong>label</strong> (case-insensitive match in evaluator). Used for entity CRUD and reads.</li>
+        <li><code>"WORKS_AT"</code>, <code>"INFLUENCED"</code>, … — <strong>relationship type</strong> for edge create/delete and write checks.</li>
+        <li><code>"deal.amount"</code> — field-level resource: <code>&lt;label&gt;.&lt;property&gt;</code> (lowercase label in practice). Used with <code>read</code> for allowlist/denylist masking.</li>
+      </ul>
+
+      <h3 id="policy-evaluation">Evaluation rules (summary)</h3>
+      <ul class="params">
+        <li><strong>Read / write</strong> — Policies whose <code>actions</code> include the requested action and whose <code>resources</code> match the requested resource (or field prefix) are collected. <code>deny</code> on the whole type (<code>*</code> or exact label) blocks access. <code>allow</code> must be present for access to be granted.</li>
+        <li><strong><code>conditions.ids</code></strong> — If present, the policy only applies when the checked instance includes <code>{"id": "&lt;value&gt;"}</code> and that id is in the list. Useful for “this token may only read these deal ids”.</li>
+        <li><strong>Field masking (<code>mask_fields</code>)</strong> — On read, if there is a type-level read allow, <code>deny</code> policies on <code>deal.secret_field</code> strip those keys from returned properties. If there is <em>no</em> type-level allow but only field-level <code>allow</code> policies, the result is allowlist mode: only allowed fields remain.</li>
+        <li><strong>Redaction (<code>redact_mode</code> on token)</strong> — If the principal may not read a node, the adapter either returns a stub node with <code>{"_redacted": true}</code> (<code>hint</code>) or omits it entirely (<code>hide</code>), depending on <code>AccessToken.redact_mode</code>.</li>
+      </ul>
+
+      <h3 id="policy-presets">Built-in presets (<code>PRESETS</code>)</h3>
+      <table>
+        <thead><tr><th>Name</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>full_access</code></td><td>Allow read+write on <code>*</code></td></tr>
+          <tr><td><code>read_all</code></td><td>Allow read on <code>*</code></td></tr>
+          <tr><td><code>write_all</code></td><td>Allow write on <code>*</code></td></tr>
+          <tr><td><code>no_raw_content</code></td><td>Deny read on sensitive field resources (e.g. email body, transcripts)</td></tr>
+        </tbody>
+      </table>
+      <p>Merge presets and add your own via <code>create_token_from_presets(..., custom_presets={...})</code> and <code>extra_policies=[...]</code>.</p>
+
+      <h3 id="access-token-model"><code>AccessToken</code> row</h3>
+      <p>
+        Tokens are usually <strong>persisted</strong> in your app database (SQLAlchemy). The
+        <code>AccessToken</code> model carries <code>tenant_id</code>, <code>owner_id</code>,
+        <code>owner_type</code>, a JSON string of <code>policies</code>, <code>redact_mode</code>
+        (<code>hint</code> vs <code>hide</code>), <code>label</code>, <code>is_active</code>, and timestamps.
+        Load the row and pass it to <code>Scope(...)</code> per request or agent session; the graph adapter
+        never bypasses what that row allows.
+      </p>
+
+      <h3 id="permission-examples">Real-world permission examples</h3>
+      <p>
+        Examples align with issuing per-agent <code>AccessToken</code> rows in apps such as <strong>CRM2</strong>.
+        <strong>Policy approach</strong> is shorthand for JSON policies (<code>effect</code>, <code>actions</code>,
+        <code>resources</code>, optional <code>conditions.ids</code> for row-level scope). Use
+        <code>label.field</code> resources (e.g. <code>deal.amount</code>, <code>email.body</code>) for masking.
+        The last column is what the principal <strong>sees</strong> after <code>mask_fields</code> and redaction.
+      </p>
+      <table>
+        <thead><tr><th>Principal</th><th>Internal / external</th><th>Use case</th><th>Policy approach (shorthand)</th><th>What they get</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>RevOps / platform agent</td>
+            <td>Internal</td>
+            <td>Automation, seeding, ETL-style jobs</td>
+            <td><code>full_access</code> (or <code>read_all</code> + <code>write_all</code>)</td>
+            <td>All labels, relationships, and fields the app exposes</td>
+          </tr>
+          <tr>
+            <td>VP Sales</td>
+            <td>Internal</td>
+            <td>Pipeline and forecasting</td>
+            <td><code>allow</code> read+write on <code>Deal</code>, <code>Account</code>, <code>Contact</code>; comms labels as needed</td>
+            <td>Full deal payload (amount, stage, notes) + linked people and accounts</td>
+          </tr>
+          <tr>
+            <td>Account executive</td>
+            <td>Internal</td>
+            <td>Run their book</td>
+            <td><code>allow</code> on <code>Account</code>, <code>Contact</code>, <code>Deal</code>; optional <code>conditions.ids</code> to limit rows</td>
+            <td>Standard CRM fields for allowed rows; comms per row below</td>
+          </tr>
+          <tr>
+            <td>AE — no raw comms</td>
+            <td>Internal</td>
+            <td>Compliance: no bodies / transcripts</td>
+            <td>Type <code>allow</code> on <code>Email</code>/<code>Call</code> + <code>deny</code> on <code>body</code>, <code>transcript</code>, <code>recording_url</code> (or preset <code>no_raw_content</code>)</td>
+            <td>Subject, summary, timestamps, duration — not raw content</td>
+          </tr>
+          <tr>
+            <td>SDR / BDR</td>
+            <td>Internal</td>
+            <td>Qualify; no finance detail</td>
+            <td><code>allow</code> read <code>deal</code> + <code>deny</code> <code>deal.amount</code>, <code>deal.probability</code></td>
+            <td>Name, stage, dates, links — not sensitive financial fields</td>
+          </tr>
+          <tr>
+            <td>Demand gen manager</td>
+            <td>Internal</td>
+            <td>Campaigns, attribution, lead queues</td>
+            <td><code>allow</code> <code>Campaign</code>, <code>Lead</code>; read <code>Deal</code> with field denies on revenue if needed</td>
+            <td>Programs + leads + deal headers for attribution, not full commercial payload</td>
+          </tr>
+          <tr>
+            <td>Analytics / “stats only” agent</td>
+            <td>Internal</td>
+            <td>Dashboards, funnels; minimal PII</td>
+            <td>Allowlist narrow fields or dedicated aggregate/metric labels; deny broad <code>Contact</code>/<code>Lead</code> if required</td>
+            <td>Counts, stage mix, trends — tune to schema; avoid raw row dumps</td>
+          </tr>
+          <tr>
+            <td>Scoped deals token</td>
+            <td>Internal or external</td>
+            <td>Only specific opportunities</td>
+            <td><code>allow</code> read <code>deal</code> + <code>conditions.ids</code> listing allowed deal ids</td>
+            <td>Only those deals (plus fields allowed by other policies)</td>
+          </tr>
+          <tr>
+            <td>Scoped deals + no payloads</td>
+            <td>External</td>
+            <td>Partner or outsourced SDR on a slice</td>
+            <td><code>conditions.ids</code> on <code>deal</code> + field <code>deny</code> on <code>email.body</code>, <code>call.transcript</code>, etc.</td>
+            <td>Named deals and stages; activity metadata only, not raw messages</td>
+          </tr>
+          <tr>
+            <td>External co-sell partner agent</td>
+            <td>External</td>
+            <td>Partner-sourced pipeline only</td>
+            <td><code>conditions.ids</code> on partner deals + <code>deny</code> on <code>deal.amount</code>, internal notes + strict comms policy</td>
+            <td>Thin deal card: name, stage, dates; amount masked or omitted</td>
+          </tr>
+          <tr>
+            <td>Customer portal assistant</td>
+            <td>External</td>
+            <td>“Status of our renewal”</td>
+            <td><code>allow</code> only that customer’s <code>Account</code>/<code>Deal</code>/<code>Contract</code> slice + allowlist fields</td>
+            <td>Status, renewal dates, open tasks — no other customers’ data</td>
+          </tr>
+          <tr>
+            <td>Support vendor bot</td>
+            <td>External</td>
+            <td>Tickets + minimal CRM context</td>
+            <td><code>allow</code> <code>Ticket</code>, limited <code>Account</code>/<code>Contact</code> + <code>deny</code> revenue and unrelated deals</td>
+            <td>Case data + customer identity — not full pipeline or finance</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><strong>JSON policy examples</strong> (illustrative — merge via <code>extra_policies</code> or a custom preset):</p>
+      <pre><code># SDR: read deals but strip financial fields (denylist on top of type allow)
+SDR_DEAL_POLICIES = [
+    {"effect": "allow", "actions": ["read"], "resources": ["deal"], "conditions": {}},
+    {"effect": "deny", "actions": ["read"], "resources": ["deal.amount", "deal.probability"], "conditions": {}},
+]
+
+# External partner: only two email columns (allowlist — no type-level "email" allow)
+PARTNER_EMAIL_POLICIES = [
+    {"effect": "allow", "actions": ["read"], "resources": ["email.subject"], "conditions": {}},
+    {"effect": "allow", "actions": ["read"], "resources": ["email.summary"], "conditions": {}},
+]
+
+token = create_token_from_presets(
+    tenant, "sdr-1", "agent", [], extra_policies=SDR_DEAL_POLICIES, label="sdr"
+)
+scope = Scope(token)</code></pre>
+
+      <h3 id="create-token-from-presets"><code>create_token_from_presets</code></h3>
+      <table>
+        <thead><tr><th>Parameter</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>tenant_id</code></td><td>UUID (or str) — every query is scoped to this tenant</td></tr>
+          <tr><td><code>owner_id</code></td><td>String id of the principal (user, agent, service)</td></tr>
+          <tr><td><code>owner_type</code></td><td>Short type tag (e.g. <code>"agent"</code>, <code>"service"</code>)</td></tr>
+          <tr><td><code>preset_names</code></td><td>List of preset keys to merge in order</td></tr>
+          <tr><td><code>extra_policies</code></td><td>Optional extra policy dicts appended after presets</td></tr>
+          <tr><td><code>custom_presets</code></td><td>Optional dict like <code>PRESETS</code> merged into the preset namespace</td></tr>
+          <tr><td><code>label</code></td><td>Human-friendly token label</td></tr>
+          <tr><td><code>redact_mode</code></td><td><code>"hint"</code> (default) or <code>"hide"</code></td></tr>
+          <tr><td><code>is_active</code></td><td>Stored on row; enforcement is your app’s responsibility if you persist tokens</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="scope-api"><code>Scope</code> API</h3>
+      <table>
+        <thead><tr><th>Member</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>tenant_id</code></td><td>String tenant from token</td></tr>
+          <tr><td><code>owner_id</code>, <code>owner_type</code></td><td>Principal metadata</td></tr>
+          <tr><td><code>redact_mode</code></td><td><code>hint</code> / <code>hide</code></td></tr>
+          <tr><td><code>policies</code></td><td>Parsed list of policy dicts</td></tr>
+          <tr><td><code>can_read(resource, instance=None)</code></td><td>Label, edge type, or field resource</td></tr>
+          <tr><td><code>can_write(resource, instance=None)</code></td><td>Same for mutations</td></tr>
+          <tr><td><code>mask_fields(resource, fields)</code></td><td>Returns filtered property dict per read policies</td></tr>
+          <tr><td><code>apply_redaction(label, node)</code></td><td>Stub or <code>None</code> for unreadable nodes</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="token-scope-example">Example: token → scope → call</h3>
+      <pre><code>import uuid
+from crmdb import create_token_from_presets, Scope, CrmDB
+
+tenant = uuid.UUID("00000000-0000-4000-8000-000000000001")
+token = create_token_from_presets(
+    tenant,
+    owner_id="demand-gen-agent",
+    owner_type="agent",
+    preset_names=["full_access"],
+    label="token:demand_gen",
+    redact_mode="hint",
+)
+scope = Scope(token)
+
+db = CrmDB()
+await db.connect()
+lead = await db.leads.create(scope, company_name="Acme", status="new")
+await db.close()</code></pre>
+      <p>
+        For production, persist <code>AccessToken</code> rows via SQLAlchemy, load the row, and construct
+        <code>Scope(AccessToken(...))</code> per request or session. GTMDB does not cache scopes; you can
+        issue one scope per agent or user as your app requires.
+      </p>
+
+      <h2 id="types">Types &amp; configuration</h2>
+      <h3><code>CrmdbSettings</code> (env prefix <code>CRMDB_</code>)</h3>
+      <table>
+        <thead><tr><th>Field</th><th>Default</th></tr></thead>
+        <tbody>
+          <tr><td><code>neo4j_uri</code></td><td><code>bolt://localhost:7687</code></td></tr>
+          <tr><td><code>neo4j_user</code></td><td><code>neo4j</code></td></tr>
+          <tr><td><code>neo4j_password</code></td><td><code>crmdb_password</code></td></tr>
+        </tbody>
+      </table>
+      <h3>Exported models</h3>
+      <p><code>Lead</code>, <code>Account</code>, <code>Contact</code>, <code>Deal</code>, <code>Campaign</code>, <code>Entity</code>, <code>Relationship</code> — dataclasses with typed fields in the package today. The full surface area is described under <a href="#entity-roadmap">GTM entity model</a>.</p>
+      <h3><code>NodeData</code> / <code>EdgeData</code></h3>
+      <p>Import from <code>crmdb.types</code>. <code>NodeData(label, id, tenant_id, properties)</code>; <code>EdgeData(type, from_id, to_id, properties={})</code>.</p>
+
+      <h2 id="seed">Seed demo data</h2>
+      <pre><code>from crmdb import CrmDB, seed_sample_graph, create_token_from_presets, Scope
+import uuid
+
+db = CrmDB()
+await db.connect()
+tenant = uuid.UUID("00000000-0000-4000-8000-000000000001")
+token = create_token_from_presets(tenant, "seed", "service", ["full_access"], label="seed")
+scope = Scope(token)
+meta = await seed_sample_graph(db, scope, id_suffix="1")
+print(meta["ids"])</code></pre>
+
+      <footer>
+        Static reference for the <code>crmdb</code> Python package. Open this file in a browser.
+        Implementation details may change — refer to source under <code>src/crmdb/</code>.
+      </footer>
+    </main>
+  </div>
+  <script>
+    (function () {
+      var links = document.querySelectorAll('aside nav a');
+      var byId = {};
+      links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+      var sections = Object.keys(byId).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+      function onScroll() {
+        var y = window.scrollY + 120;
+        var current = sections[0] && sections[0].id;
+        sections.forEach(function (sec) {
+          if (sec.offsetTop <= y) current = sec.id;
+        });
+        links.forEach(function (a) {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+        });
+        var active = document.querySelector('aside nav a.active');
+        if (active) {
+          var det = active.closest('details.nav-section');
+          if (det && !det.open) det.open = true;
+        }
+      }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+
+      var aside = document.getElementById('doc-sidebar');
+      var railBtn = document.getElementById('sidebar-rail-toggle');
+      var railKey = 'gtmdb-doc-sidebar-collapsed';
+      function sidebarMobile() {
+        return window.matchMedia('(max-width: 860px)').matches;
+      }
+      function setSidebarCollapsed(collapsed) {
+        if (!aside || !railBtn) return;
+        if (sidebarMobile()) {
+          aside.classList.remove('is-collapsed');
+          railBtn.setAttribute('aria-expanded', 'true');
+          railBtn.textContent = '\u27e8';
+          railBtn.setAttribute('aria-label', 'Collapse sidebar');
+          railBtn.setAttribute('title', 'Collapse sidebar');
+          return;
+        }
+        aside.classList.toggle('is-collapsed', collapsed);
+        railBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        railBtn.textContent = collapsed ? '\u27e9' : '\u27e8';
+        railBtn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+        railBtn.setAttribute('title', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+        try {
+          localStorage.setItem(railKey, collapsed ? '1' : '0');
+        } catch (e) {}
+      }
+      if (aside && railBtn) {
+        if (!sidebarMobile()) {
+          try {
+            if (localStorage.getItem(railKey) === '1') setSidebarCollapsed(true);
+          } catch (e) {}
+        }
+        railBtn.addEventListener('click', function () {
+          setSidebarCollapsed(!aside.classList.contains('is-collapsed'));
+        });
+        var resizeTimer;
+        window.addEventListener('resize', function () {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(function () {
+            if (sidebarMobile()) {
+              aside.classList.remove('is-collapsed');
+              railBtn.setAttribute('aria-expanded', 'true');
+              railBtn.textContent = '\u27e8';
+            } else {
+              try {
+                setSidebarCollapsed(localStorage.getItem(railKey) === '1');
+              } catch (e) {
+                setSidebarCollapsed(false);
+              }
+            }
+          }, 100);
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
