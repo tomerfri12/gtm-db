@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from crmdb.api._base import EntityAPI
-from crmdb.api.models import Lead, Score
-from crmdb.api.scores import ScoresAPI
-from crmdb.scope import Scope
-from crmdb.types import EdgeData
+from gtmdb.api._base import EntityAPI
+from gtmdb.api.models import Lead, Score
+from gtmdb.api.scores import ScoresAPI
+from gtmdb.scope import Scope
+from gtmdb.types import EdgeData
 
 
 def _composed_lead_name(

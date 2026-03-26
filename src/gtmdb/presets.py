@@ -6,7 +6,7 @@ import json
 import uuid
 from typing import Any
 
-from crmdb.tokens import AccessToken
+from gtmdb.tokens import AccessToken
 
 # Generic library-level presets (JSON-serializable policy dicts)
 PRESETS: dict[str, list[dict[str, Any]]] = {

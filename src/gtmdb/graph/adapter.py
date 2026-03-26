@@ -13,18 +13,18 @@ from typing import Any
 
 import neo4j
 
-from crmdb.config import CrmdbSettings
-from crmdb.graph import schema as _schema
-from crmdb.graph.mutations import cypher_create_edge, cypher_create_node
-from crmdb.graph import traversal as tr
-from crmdb.scope import Scope
-from crmdb.types import EdgeData, NodeData
+from gtmdb.config import GtmdbSettings
+from gtmdb.graph import schema as _schema
+from gtmdb.graph.mutations import cypher_create_edge, cypher_create_node
+from gtmdb.graph import traversal as tr
+from gtmdb.scope import Scope
+from gtmdb.types import EdgeData, NodeData
 
 
 class GraphAdapter:
     """Async Neo4j adapter with tenant isolation and scope checks."""
 
-    def __init__(self, settings: CrmdbSettings) -> None:
+    def __init__(self, settings: GtmdbSettings) -> None:
         self._driver = neo4j.AsyncGraphDatabase.driver(
             settings.neo4j_uri,
             auth=(settings.neo4j_user, settings.neo4j_password),

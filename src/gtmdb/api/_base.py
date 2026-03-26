@@ -6,10 +6,10 @@ import dataclasses
 from datetime import datetime, timezone
 from typing import Any, Generic, TypeVar
 
-from crmdb.api.models import Entity
-from crmdb.graph.adapter import GraphAdapter
-from crmdb.scope import Scope
-from crmdb.types import EdgeData, NodeData
+from gtmdb.api.models import Entity
+from gtmdb.graph.adapter import GraphAdapter
+from gtmdb.scope import Scope
+from gtmdb.types import EdgeData, NodeData
 
 T = TypeVar("T", bound=Entity)
 

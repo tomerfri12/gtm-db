@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from crmdb.api._base import EntityAPI
-from crmdb.api.communication_events.emails import EmailsAPI
-from crmdb.api.models import EmailCampaign
-from crmdb.scope import Scope
-from crmdb.types import EdgeData
+from gtmdb.api._base import EntityAPI
+from gtmdb.api.communication_events.emails import EmailsAPI
+from gtmdb.api.models import EmailCampaign
+from gtmdb.scope import Scope
+from gtmdb.types import EdgeData
 
 
 class EmailCampaignAPI(EntityAPI[EmailCampaign]):

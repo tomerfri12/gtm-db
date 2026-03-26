@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from crmdb.api._base import EntityAPI
-from crmdb.api.models import Campaign
-from crmdb.scope import Scope
-from crmdb.types import EdgeData
+from gtmdb.api._base import EntityAPI
+from gtmdb.api.models import Campaign
+from gtmdb.scope import Scope
+from gtmdb.types import EdgeData
 
 
 class CampaignsAPI(EntityAPI[Campaign]):
@@ -38,7 +38,7 @@ class CampaignsAPI(EntityAPI[Campaign]):
         records = await self._graph.execute(
             scope, query, {"campaign_id": campaign_id},
         )
-        from crmdb.api.deals import DealsAPI
+        from gtmdb.api.deals import DealsAPI
 
         deal_api = DealsAPI(self._graph)
         results: list[dict] = []

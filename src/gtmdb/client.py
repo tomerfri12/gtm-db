@@ -1,7 +1,7 @@
-"""CrmDB -- the top-level client that consumers interact with.
+"""GtmDB -- the top-level client that consumers interact with.
 
 Manages internal graph and auxiliary stores and exposes a typed API.
-Consumers use :func:`crmdb.connect.connect_crmdb` and never import drivers
+Consumers use :func:`gtmdb.connect.connect_gtmdb` and never import drivers
 or backend-specific adapters.
 """
 
@@ -9,26 +9,26 @@ from __future__ import annotations
 
 from typing import Any
 
-from crmdb.api.accounts import AccountsAPI
-from crmdb.api.actors import ActorsAPI
-from crmdb.api.campaigns import CampaignsAPI
-from crmdb.api.communication_events import EmailCampaignAPI, EmailsAPI
-from crmdb.api.contacts import ContactsAPI
-from crmdb.api.deals import DealsAPI
-from crmdb.api.leads import LeadsAPI
-from crmdb.api.scores import ScoresAPI
-from crmdb.api.relationships import RelationshipsAPI
-from crmdb.config import CrmdbSettings
-from crmdb.graph.adapter import GraphAdapter
-from crmdb.scope import Scope
-from crmdb.types import EdgeData, NodeData
+from gtmdb.api.accounts import AccountsAPI
+from gtmdb.api.actors import ActorsAPI
+from gtmdb.api.campaigns import CampaignsAPI
+from gtmdb.api.communication_events import EmailCampaignAPI, EmailsAPI
+from gtmdb.api.contacts import ContactsAPI
+from gtmdb.api.deals import DealsAPI
+from gtmdb.api.leads import LeadsAPI
+from gtmdb.api.scores import ScoresAPI
+from gtmdb.api.relationships import RelationshipsAPI
+from gtmdb.config import GtmdbSettings
+from gtmdb.graph.adapter import GraphAdapter
+from gtmdb.scope import Scope
+from gtmdb.types import EdgeData, NodeData
 
 
-class CrmDB:
-    """High-level async client for the CRMDB managed service."""
+class GtmDB:
+    """High-level async client for the GtmDB managed service."""
 
-    def __init__(self, settings: CrmdbSettings | None = None) -> None:
-        self._settings = settings or CrmdbSettings()
+    def __init__(self, settings: GtmdbSettings | None = None) -> None:
+        self._settings = settings or GtmdbSettings()
         self._graph = GraphAdapter(self._settings)
 
         self._leads: LeadsAPI | None = None

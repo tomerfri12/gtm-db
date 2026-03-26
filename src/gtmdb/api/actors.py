@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from crmdb.api.models import ActorSpec
-from crmdb.graph.adapter import GraphAdapter
-from crmdb.scope import Scope
+from gtmdb.api.models import ActorSpec
+from gtmdb.graph.adapter import GraphAdapter
+from gtmdb.scope import Scope
 
 
 class ActorsAPI:

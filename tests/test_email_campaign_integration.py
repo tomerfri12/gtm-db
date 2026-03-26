@@ -8,17 +8,17 @@ import uuid
 import pytest
 
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("CRMDB_RUN_NEO4J_IT"),
-    reason="Set CRMDB_RUN_NEO4J_IT=1 with Neo4j running (crmdb/docker-compose.yml)",
+    not os.environ.get("GtmDB_RUN_NEO4J_IT"),
+    reason="Set GtmDB_RUN_NEO4J_IT=1 with Neo4j running (gtmdb/docker-compose.yml)",
 )
 
 
 @pytest.mark.asyncio
 async def test_email_campaign_create_with_artifacts_creates_graph() -> None:
-    from crmdb import CrmDB, Scope, create_token_from_presets
-    from crmdb.api.models import ActorSpec
+    from gtmdb import GtmDB, Scope, create_token_from_presets
+    from gtmdb.api.models import ActorSpec
 
-    db = CrmDB()
+    db = GtmDB()
     await db.connect()
 
     tid = uuid.uuid4()
@@ -86,10 +86,10 @@ async def test_email_campaign_create_with_artifacts_creates_graph() -> None:
 
 @pytest.mark.asyncio
 async def test_emails_crud_smoke() -> None:
-    from crmdb import CrmDB, Scope, create_token_from_presets
-    from crmdb.api.models import ActorSpec
+    from gtmdb import GtmDB, Scope, create_token_from_presets
+    from gtmdb.api.models import ActorSpec
 
-    db = CrmDB()
+    db = GtmDB()
     await db.connect()
 
     tid = uuid.uuid4()

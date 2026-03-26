@@ -7,15 +7,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from crmdb.types import EdgeData, NodeData
+from gtmdb.types import EdgeData, NodeData
 
 if TYPE_CHECKING:
-    from crmdb.client import CrmDB
-    from crmdb.scope import Scope
+    from gtmdb.client import GtmDB
+    from gtmdb.scope import Scope
 
 
 async def seed_sample_graph(
-    db: "CrmDB",
+    db: "GtmDB",
     scope: "Scope",
     *,
     id_suffix: str = "1",

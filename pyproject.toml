@@ -16,7 +16,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-crmdb = "crmdb.__main__:main"
+gtmdb = "gtmdb.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

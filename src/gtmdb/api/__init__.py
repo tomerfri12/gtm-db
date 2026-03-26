@@ -1,8 +1,8 @@
-"""CRMDB typed entity CRUD API.
+"""GtmDB typed entity CRUD API.
 
-Usage via CrmDB client::
+Usage via GtmDB client::
 
-    db = CrmDB()
+    db = GtmDB()
     await db.connect()
 
     lead = await db.leads.create(scope, first_name="Jane", company_name="Acme")
@@ -14,14 +14,14 @@ Usage via CrmDB client::
     await db.relationships.create(scope, lead.id, "WORKS_AT", account.id)
 """
 
-from crmdb.api.accounts import AccountsAPI
-from crmdb.api.actors import ActorsAPI
-from crmdb.api.campaigns import CampaignsAPI
-from crmdb.api.communication_events import EmailCampaignAPI, EmailsAPI
-from crmdb.api.contacts import ContactsAPI
-from crmdb.api.deals import DealsAPI
-from crmdb.api.leads import LeadsAPI
-from crmdb.api.models import (
+from gtmdb.api.accounts import AccountsAPI
+from gtmdb.api.actors import ActorsAPI
+from gtmdb.api.campaigns import CampaignsAPI
+from gtmdb.api.communication_events import EmailCampaignAPI, EmailsAPI
+from gtmdb.api.contacts import ContactsAPI
+from gtmdb.api.deals import DealsAPI
+from gtmdb.api.leads import LeadsAPI
+from gtmdb.api.models import (
     Account,
     Actor,
     ActorSpec,
@@ -35,8 +35,8 @@ from crmdb.api.models import (
     Relationship,
     Score,
 )
-from crmdb.api.scores import ScoresAPI
-from crmdb.api.relationships import RelationshipsAPI
+from gtmdb.api.scores import ScoresAPI
+from gtmdb.api.relationships import RelationshipsAPI
 
 __all__ = [
     "Account",

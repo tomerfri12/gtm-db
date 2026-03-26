@@ -1,6 +1,6 @@
 """Integration tests against a live Neo4j (opt-in).
 
-Set ``CRMDB_RUN_NEO4J_IT=1`` and start ``docker compose`` in ``crmdb/``.
+Set ``GtmDB_RUN_NEO4J_IT=1`` and start ``docker compose`` in ``gtmdb/``.
 """
 
 from __future__ import annotations
@@ -11,17 +11,17 @@ import uuid
 import pytest
 
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("CRMDB_RUN_NEO4J_IT"),
-    reason="Set CRMDB_RUN_NEO4J_IT=1 with Neo4j running (crmdb/docker-compose.yml)",
+    not os.environ.get("GtmDB_RUN_NEO4J_IT"),
+    reason="Set GtmDB_RUN_NEO4J_IT=1 with Neo4j running (gtmdb/docker-compose.yml)",
 )
 
 
 @pytest.mark.asyncio
 async def test_seed_and_phase3_traversals() -> None:
-    from crmdb import CrmDB, Scope, create_token_from_presets
-    from crmdb.seed import seed_sample_graph
+    from gtmdb import GtmDB, Scope, create_token_from_presets
+    from gtmdb.seed import seed_sample_graph
 
-    db = CrmDB()
+    db = GtmDB()
     await db.connect()
 
     tid = uuid.uuid4()
@@ -75,10 +75,10 @@ async def test_seed_and_phase3_traversals() -> None:
 async def test_pipeline_denies_without_deal_read() -> None:
     import json
 
-    from crmdb import CrmDB, Scope
-    from crmdb.tokens import AccessToken
+    from gtmdb import GtmDB, Scope
+    from gtmdb.tokens import AccessToken
 
-    db = CrmDB()
+    db = GtmDB()
     await db.connect()
 
     token = AccessToken(

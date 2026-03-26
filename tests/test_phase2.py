@@ -7,10 +7,10 @@ import uuid
 
 import pytest
 
-from crmdb.presets import PRESETS, create_token_from_presets
-from crmdb.scope import Scope
-from crmdb.tokens import AccessToken
-from crmdb.types import NodeData
+from gtmdb.presets import PRESETS, create_token_from_presets
+from gtmdb.scope import Scope
+from gtmdb.tokens import AccessToken
+from gtmdb.types import NodeData
 
 
 def _token(policies: list[dict], redact_mode: str = "hint") -> AccessToken:

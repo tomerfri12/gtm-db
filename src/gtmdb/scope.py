@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from crmdb.types import NodeData
+from gtmdb.types import NodeData
 
 if TYPE_CHECKING:
-    from crmdb.tokens import AccessToken
+    from gtmdb.tokens import AccessToken
 
 
 class Scope:

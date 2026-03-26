@@ -1,4 +1,4 @@
-"""Typed entity dataclasses for the CRMDB CRUD API.
+"""Typed entity dataclasses for the GtmDB CRUD API.
 
 Each entity has explicit fields rather than a generic properties dict.
 System-managed fields (id, tenant_id, created_at, updated_at,
@@ -136,7 +136,7 @@ class Email(Entity):
 
 @dataclass
 class ActorSpec:
-    """Input for :meth:`crmdb.api.actors.ActorsAPI.create` (batch upsert)."""
+    """Input for :meth:`gtmdb.api.actors.ActorsAPI.create` (batch upsert)."""
 
     id: str
     kind: str

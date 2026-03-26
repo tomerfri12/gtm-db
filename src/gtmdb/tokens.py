@@ -11,9 +11,9 @@ def _utcnow() -> datetime:
 
 @dataclass
 class AccessToken:
-    """In-memory credential for :class:`crmdb.scope.Scope` (policy evaluation).
+    """In-memory credential for :class:`gtmdb.scope.Scope` (policy evaluation).
 
-    Host apps (e.g. CRM2) may persist tokens in their own store; CRMDB does not
+    Host apps (e.g. CRM2) may persist tokens in their own store; GtmDB does not
     accept a SQL engine or manage Postgres tables for consumers.
     """
 

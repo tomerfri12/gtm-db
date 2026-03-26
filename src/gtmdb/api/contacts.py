@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from crmdb.api._base import EntityAPI
-from crmdb.api.models import Contact
-from crmdb.scope import Scope
-from crmdb.types import EdgeData
+from gtmdb.api._base import EntityAPI
+from gtmdb.api.models import Contact
+from gtmdb.scope import Scope
+from gtmdb.types import EdgeData
 
 
 class ContactsAPI(EntityAPI[Contact]):

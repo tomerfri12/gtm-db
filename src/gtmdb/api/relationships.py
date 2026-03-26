@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from crmdb.api.models import Relationship
-from crmdb.graph.adapter import GraphAdapter
-from crmdb.scope import Scope
-from crmdb.types import EdgeData
+from gtmdb.api.models import Relationship
+from gtmdb.graph.adapter import GraphAdapter
+from gtmdb.scope import Scope
+from gtmdb.types import EdgeData
 
 
 class RelationshipsAPI:

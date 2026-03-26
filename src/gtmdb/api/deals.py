@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from crmdb.api._base import EntityAPI
-from crmdb.api.models import Deal
-from crmdb.scope import Scope
-from crmdb.types import EdgeData
+from gtmdb.api._base import EntityAPI
+from gtmdb.api.models import Deal
+from gtmdb.scope import Scope
+from gtmdb.types import EdgeData
 
 
 class DealsAPI(EntityAPI[Deal]):

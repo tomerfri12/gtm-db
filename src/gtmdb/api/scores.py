@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from crmdb.api._base import EntityAPI
-from crmdb.api.models import Score
-from crmdb.scope import Scope
-from crmdb.types import EdgeData
+from gtmdb.api._base import EntityAPI
+from gtmdb.api.models import Score
+from gtmdb.scope import Scope
+from gtmdb.types import EdgeData
 
 
 class ScoresAPI(EntityAPI[Score]):

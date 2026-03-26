@@ -1,8 +1,8 @@
-# CRMDB
+# GtmDB
 
-Managed graph service for CRM data. **The graph backend is owned by this package**; host apps use the `crmdb` Python client (`connect_crmdb`, entity APIs) and never pass in SQL engines or app databases.
+Managed graph service for CRM data. **The graph backend is owned by this package**; host apps use the `gtmdb` Python client (`connect_gtmdb`, entity APIs) and never pass in SQL engines or app databases.
 
-Access tokens for `crmdb.scope.Scope` are plain in-memory objects; if a host app persists them, that lives in the host’s own store (e.g. CRM2’s Postgres).
+Access tokens for `gtmdb.scope.Scope` are plain in-memory objects; if a host app persists them, that lives in the host’s own store (e.g. CRM2’s Postgres).
 
 ## Local graph store
 
@@ -16,17 +16,17 @@ Default ports: **7474** (HTTP/Browser), **7687** (Bolt). Auth matches `NEO4J_AUT
 
 ## Bootstrap schema (operators / new environments)
 
-Run once against a **new** graph instance before clients rely on indexes/constraints. With a `.env` in the **current working directory** (repo root) containing `CRMDB_*` from `.env.example`:
+Run once against a **new** graph instance before clients rely on indexes/constraints. With a `.env` in the **current working directory** (repo root) containing `GTMDB_*` from `.env.example`:
 
 ```bash
-python -m crmdb init
-python -m crmdb init --seed   # optional demo nodes
+python -m gtmdb init
+python -m gtmdb init --seed   # optional demo nodes
 ```
 
 Or, after `pip install -e ./crmdb`:
 
 ```bash
-crmdb init --seed
+gtmdb init --seed
 ```
 
 ## Connect later (Neo4j Browser / console)
@@ -46,4 +46,4 @@ crmdb init --seed
 
 ## Host application (CRM2)
 
-CRM2 calls `connect_crmdb()` only (no Postgres engine, no CRMDB “init” from the app). Set `CRMDB_*` so the client reaches an already-running graph endpoint.
+CRM2 calls `connect_gtmdb()` only (no Postgres engine, no GtmDB “init” from the app). Set `GTMDB_*` so the client reaches an already-running graph endpoint.
