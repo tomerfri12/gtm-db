@@ -13,11 +13,16 @@ class CampaignsAPI(EntityAPI[Campaign]):
     _entity_cls = Campaign
 
     async def link_deal(
-        self, scope: Scope, campaign_id: str, deal_id: str,
+        self,
+        scope: Scope,
+        campaign_id: str,
+        deal_id: str,
+        *,
+        reasoning: str | None = None,
     ) -> None:
         """Create an INFLUENCED edge from this campaign to a deal."""
         await self._graph.create_edge(
-            scope, EdgeData("INFLUENCED", campaign_id, deal_id),
+            scope, EdgeData("INFLUENCED", campaign_id, deal_id, reasoning=reasoning),
         )
 
     async def influenced_deals(

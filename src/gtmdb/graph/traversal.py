@@ -43,7 +43,8 @@ async def cypher_get_neighbors(
     query = (
         f"MATCH {pattern} "
         "WHERE a.id = $id AND a.tenant_id = $tid AND b.tenant_id = $tid "
-        "RETURN properties(b) AS props, labels(b) AS labels, type(r) AS rel_type"
+        "RETURN properties(b) AS props, labels(b) AS labels, type(r) AS rel_type, "
+        "properties(r) AS rel_props"
     )
     result = await tx.run(query, id=node_id, tid=tenant_id)
     records = [record async for record in result]
@@ -52,6 +53,7 @@ async def cypher_get_neighbors(
             "properties": dict(r["props"]),
             "labels": list(r["labels"]),
             "edge_type": r["rel_type"],
+            "rel_props": dict(r["rel_props"]) if r.get("rel_props") else {},
         }
         for r in records
     ]
@@ -72,7 +74,8 @@ async def cypher_entity_360(
         "AND n <> a "
         "WITH n, path, relationships(path) AS rels "
         "RETURN DISTINCT properties(n) AS props, labels(n) AS labels, "
-        "length(path) AS depth, type(rels[-1]) AS rel_type "
+        "length(path) AS depth, type(rels[-1]) AS rel_type, "
+        "properties(rels[-1]) AS rel_props "
         "LIMIT 300"
     )
     result = await tx.run(query, id=anchor_id, tid=tenant_id)
@@ -83,6 +86,7 @@ async def cypher_entity_360(
             "labels": list(r["labels"]),
             "depth": int(r["depth"]),
             "edge_type": r["rel_type"],
+            "rel_props": dict(r["rel_props"]) if r.get("rel_props") else {},
         }
         for r in rows
     ]

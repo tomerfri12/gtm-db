@@ -126,6 +126,11 @@ class GraphAdapter:
             raise PermissionError(
                 f"Token {scope.owner_id} cannot write edge {edge.type}"
             )
+        merged_props = dict(edge.properties)
+        if edge.reasoning is not None:
+            rs = edge.reasoning.strip()
+            if rs:
+                merged_props["reasoning"] = rs
         async with self._driver.session() as session:
             rel_type = await session.execute_write(
                 cypher_create_edge,
@@ -133,7 +138,7 @@ class GraphAdapter:
                 edge.from_id,
                 edge.to_id,
                 scope.tenant_id,
-                edge.properties,
+                merged_props,
             )
         if rel_type is None:
             raise ValueError(
@@ -180,11 +185,14 @@ class GraphAdapter:
             labels = rec.get("labels", [])
             primary_label = labels[0] if labels else "Unknown"
             raw_props = dict(rec["properties"])
+            rel_props = dict(rec.get("rel_props") or {})
+            extra = {"edge_properties": rel_props} if rel_props else {}
             item = self._finalize_read_node(
                 scope,
                 primary_label,
                 raw_props,
                 edge_type=rec["edge_type"],
+                extra=extra or None,
             )
             if item is not None:
                 results.append(item)
@@ -215,12 +223,16 @@ class GraphAdapter:
             labels = row["labels"]
             primary_label = labels[0] if labels else "Unknown"
             raw_props = dict(row["properties"])
+            rel_props = dict(row.get("rel_props") or {})
+            extra: dict[str, Any] = {"depth": row["depth"]}
+            if rel_props:
+                extra["edge_properties"] = rel_props
             item = self._finalize_read_node(
                 scope,
                 primary_label,
                 raw_props,
                 edge_type=row["edge_type"],
-                extra={"depth": row["depth"]},
+                extra=extra,
             )
             if item is not None:
                 connected.append(item)

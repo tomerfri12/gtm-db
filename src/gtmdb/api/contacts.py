@@ -13,11 +13,16 @@ class ContactsAPI(EntityAPI[Contact]):
     _entity_cls = Contact
 
     async def assign_to_account(
-        self, scope: Scope, contact_id: str, account_id: str,
+        self,
+        scope: Scope,
+        contact_id: str,
+        account_id: str,
+        *,
+        reasoning: str | None = None,
     ) -> None:
         """Create a WORKS_AT edge from this contact to an account."""
         await self._graph.create_edge(
-            scope, EdgeData("WORKS_AT", contact_id, account_id),
+            scope, EdgeData("WORKS_AT", contact_id, account_id, reasoning=reasoning),
         )
 
     async def for_account(

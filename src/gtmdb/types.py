@@ -17,3 +17,4 @@ class EdgeData:
     from_id: str
     to_id: str
     properties: dict = field(default_factory=dict)
+    reasoning: str | None = None

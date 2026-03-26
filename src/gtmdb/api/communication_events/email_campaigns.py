@@ -21,6 +21,8 @@ class EmailCampaignAPI(EntityAPI[EmailCampaign]):
         *,
         emails: list[dict[str, Any]],
         lead_ids: list[str] | None = None,
+        has_email_reasoning: str | None = None,
+        sourced_from_reasoning: str | None = None,
         **campaign_kwargs: Any,
     ) -> dict[str, Any]:
         """Persist an EmailCampaign plus Email artifact nodes and edges (does not send mail).
@@ -48,7 +50,7 @@ class EmailCampaignAPI(EntityAPI[EmailCampaign]):
             email_ids.append(email.id)
             await self._graph.create_edge(
                 scope,
-                EdgeData("HAS_EMAIL", ec.id, email.id),
+                EdgeData("HAS_EMAIL", ec.id, email.id, reasoning=has_email_reasoning),
             )
 
         linked = 0
@@ -58,7 +60,7 @@ class EmailCampaignAPI(EntityAPI[EmailCampaign]):
                 continue
             await self._graph.create_edge(
                 scope,
-                EdgeData("SOURCED_FROM", lid, ec.id),
+                EdgeData("SOURCED_FROM", lid, ec.id, reasoning=sourced_from_reasoning),
             )
             linked += 1
 

@@ -84,6 +84,8 @@ class EntityAPI(Generic[T]):
         kwargs.setdefault("created_at", now)
         kwargs.setdefault("updated_at", now)
 
+        reasoning = kwargs.pop("reasoning", None)
+
         props = {
             k: v for k, v in kwargs.items()
             if k in self._domain_fields and v is not None
@@ -92,7 +94,7 @@ class EntityAPI(Generic[T]):
         result = await self._graph.create_node(scope, self._to_node_data(props))
         await self._graph.create_edge(
             scope,
-            EdgeData("CREATED_BY", scope.owner_id, result.id),
+            EdgeData("CREATED_BY", scope.owner_id, result.id, reasoning=reasoning),
         )
         return self._from_node_data(result)
 
@@ -160,6 +162,8 @@ class EntityAPI(Generic[T]):
                 f"Token {scope.owner_id} cannot write {self._label}"
             )
 
+        reasoning = kwargs.pop("reasoning", None)
+
         updates = {k: v for k, v in kwargs.items() if k in self._domain_fields}
         if not updates:
             return await self.get(scope, entity_id)
@@ -189,7 +193,7 @@ class EntityAPI(Generic[T]):
             return None
         await self._graph.create_edge(
             scope,
-            EdgeData("UPDATED_BY", scope.owner_id, entity_id, {"at": now}),
+            EdgeData("UPDATED_BY", scope.owner_id, entity_id, {"at": now}, reasoning=reasoning),
         )
         return self._from_raw_props(dict(records[0]["props"]), scope)
 

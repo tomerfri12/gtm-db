@@ -50,19 +50,29 @@ class LeadsAPI(EntityAPI[Lead]):
         return await super().update(scope, entity_id, **kwargs)
 
     async def assign_to_account(
-        self, scope: Scope, lead_id: str, account_id: str,
+        self,
+        scope: Scope,
+        lead_id: str,
+        account_id: str,
+        *,
+        reasoning: str | None = None,
     ) -> None:
         """Create a WORKS_AT edge from this lead to an account."""
         await self._graph.create_edge(
-            scope, EdgeData("WORKS_AT", lead_id, account_id),
+            scope, EdgeData("WORKS_AT", lead_id, account_id, reasoning=reasoning),
         )
 
     async def link_campaign(
-        self, scope: Scope, lead_id: str, campaign_id: str,
+        self,
+        scope: Scope,
+        lead_id: str,
+        campaign_id: str,
+        *,
+        reasoning: str | None = None,
     ) -> None:
         """Create a SOURCED_FROM edge from this lead to a campaign (MQL source)."""
         await self._graph.create_edge(
-            scope, EdgeData("SOURCED_FROM", lead_id, campaign_id),
+            scope, EdgeData("SOURCED_FROM", lead_id, campaign_id, reasoning=reasoning),
         )
 
     async def scores_for(

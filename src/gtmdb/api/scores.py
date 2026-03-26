@@ -15,6 +15,7 @@ class ScoresAPI(EntityAPI[Score]):
     _entity_cls = Score
 
     async def create(self, scope: Scope, **kwargs: Any) -> Score:
+        has_score_reasoning = kwargs.pop("has_score_reasoning", None)
         lead_id = kwargs.get("lead_id")
         lid = (str(lead_id).strip() if lead_id is not None else "")
         if not lid:
@@ -28,7 +29,7 @@ class ScoresAPI(EntityAPI[Score]):
         result = await super().create(scope, **kwargs)
         await self._graph.create_edge(
             scope,
-            EdgeData("HAS_SCORE", result.id, lid),
+            EdgeData("HAS_SCORE", result.id, lid, reasoning=has_score_reasoning),
         )
         return result
 

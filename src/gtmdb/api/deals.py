@@ -13,27 +13,42 @@ class DealsAPI(EntityAPI[Deal]):
     _entity_cls = Deal
 
     async def assign_to_account(
-        self, scope: Scope, deal_id: str, account_id: str,
+        self,
+        scope: Scope,
+        deal_id: str,
+        account_id: str,
+        *,
+        reasoning: str | None = None,
     ) -> None:
         """Create a BELONGS_TO edge from this deal to an account."""
         await self._graph.create_edge(
-            scope, EdgeData("BELONGS_TO", deal_id, account_id),
+            scope, EdgeData("BELONGS_TO", deal_id, account_id, reasoning=reasoning),
         )
 
     async def add_contact(
-        self, scope: Scope, deal_id: str, contact_id: str,
+        self,
+        scope: Scope,
+        deal_id: str,
+        contact_id: str,
+        *,
+        reasoning: str | None = None,
     ) -> None:
         """Create a HAS_CONTACT edge from this deal to a contact."""
         await self._graph.create_edge(
-            scope, EdgeData("HAS_CONTACT", deal_id, contact_id),
+            scope, EdgeData("HAS_CONTACT", deal_id, contact_id, reasoning=reasoning),
         )
 
     async def add_campaign(
-        self, scope: Scope, deal_id: str, campaign_id: str,
+        self,
+        scope: Scope,
+        deal_id: str,
+        campaign_id: str,
+        *,
+        reasoning: str | None = None,
     ) -> None:
         """Link a campaign to this deal via INFLUENCED (campaign -> deal)."""
         await self._graph.create_edge(
-            scope, EdgeData("INFLUENCED", campaign_id, deal_id),
+            scope, EdgeData("INFLUENCED", campaign_id, deal_id, reasoning=reasoning),
         )
 
     async def for_account(

@@ -27,16 +27,22 @@ class RelationshipsAPI:
         from_id: str,
         rel_type: str,
         to_id: str,
+        *,
+        reasoning: str | None = None,
         **props: Any,
     ) -> Relationship:
         """Create a relationship between two tenant-scoped nodes."""
-        edge = EdgeData(rel_type, from_id, to_id, dict(props) if props else {})
+        pdict = dict(props)
+        edge = EdgeData(rel_type, from_id, to_id, pdict, reasoning=reasoning)
         await self._graph.create_edge(scope, edge)
+        merged = dict(pdict)
+        if reasoning is not None and reasoning.strip():
+            merged["reasoning"] = reasoning.strip()
         return Relationship(
             type=rel_type,
             from_id=from_id,
             to_id=to_id,
-            properties=dict(props),
+            properties=merged,
         )
 
     async def list(
