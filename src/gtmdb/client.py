@@ -18,6 +18,7 @@ from gtmdb.api.deals import DealsAPI
 from gtmdb.api.leads import LeadsAPI
 from gtmdb.api.scores import ScoresAPI
 from gtmdb.api.relationships import RelationshipsAPI
+from gtmdb.api._common import optional_reasoning, require_non_empty_str
 from gtmdb.config import GtmdbSettings
 from gtmdb.graph.adapter import GraphAdapter
 from gtmdb.scope import Scope
@@ -119,8 +120,37 @@ class GtmDB:
     # Graph operations (low-level)
     # ------------------------------------------------------------------
 
-    async def create_node(self, scope: Scope, node: NodeData) -> NodeData:
-        return await self._graph.create_node(scope, node)
+    async def create_node(
+        self,
+        scope: Scope,
+        node: NodeData,
+        *,
+        actor_id: str,
+        reasoning: str | None = None,
+    ) -> NodeData:
+        """Create a node with tenant id, ensure ``Actor``, set ``created_by_actor_id``, ``CREATED_BY`` edge.
+
+        For label ``Actor``, skips ``created_by_actor_id`` / ``CREATED_BY`` (use :meth:`actors.create` for MERGE).
+        """
+        aid = require_non_empty_str(actor_id, "actor_id")
+        r = optional_reasoning(reasoning)
+        await self.actors.ensure(scope, aid)
+        props = dict(node.properties)
+        if node.label == "Actor":
+            return await self._graph.create_node(
+                scope,
+                NodeData(node.label, node.id, node.tenant_id, props),
+            )
+        props["created_by_actor_id"] = aid
+        result = await self._graph.create_node(
+            scope,
+            NodeData(node.label, node.id, node.tenant_id, props),
+        )
+        await self._graph.create_edge(
+            scope,
+            EdgeData("CREATED_BY", aid, result.id, reasoning=r),
+        )
+        return result
 
     async def create_edge(self, scope: Scope, edge: EdgeData) -> EdgeData:
         return await self._graph.create_edge(scope, edge)

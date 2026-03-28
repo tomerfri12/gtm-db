@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from gtmdb.api._common import require_non_empty_str
 from gtmdb.api.models import ActorSpec
 from gtmdb.graph.adapter import GraphAdapter
 from gtmdb.scope import Scope
@@ -61,3 +62,18 @@ SET a.kind = row.kind,
     a.updated_at = row.updated_at
 """
         await self._graph.execute(scope, query, {"rows": rows})
+
+    async def ensure(
+        self,
+        scope: Scope,
+        actor_id: str,
+        *,
+        kind: str = "ai",
+        display_name: str | None = None,
+    ) -> None:
+        """MERGE a single Actor; no-op beyond validation if id empty (caller should validate)."""
+        aid = require_non_empty_str(actor_id, "actor_id")
+        await self.create(
+            scope,
+            [ActorSpec(id=aid, kind=kind, display_name=display_name)],
+        )

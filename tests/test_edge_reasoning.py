@@ -42,9 +42,14 @@ async def test_reasoning_stored_and_visible_in_relationship_list() -> None:
         ],
     )
 
-    acc = await db.accounts.create(scope, name="Reasoning Test Account")
+    acc = await db.accounts.create(
+        scope, actor_id=owner, name="Reasoning Test Account"
+    )
     lead = await db.leads.create(
-        scope, email="reason-test@example.com", company_name="Co"
+        scope,
+        actor_id=owner,
+        email="reason-test@example.com",
+        company_name="Co",
     )
     await db.leads.assign_to_account(
         scope, lead.id, acc.id, reasoning="Matched by domain enrichment"
@@ -81,8 +86,8 @@ async def test_create_edge_reasoning_on_edge_data() -> None:
         ],
     )
 
-    a = await db.accounts.create(scope, name="R2 A")
-    b = await db.accounts.create(scope, name="R2 B")
+    a = await db.accounts.create(scope, actor_id=owner, name="R2 A")
+    b = await db.accounts.create(scope, actor_id=owner, name="R2 B")
     await db.create_edge(
         scope,
         EdgeData("TAGGED", a.id, b.id, reasoning="manual link for test"),

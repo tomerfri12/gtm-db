@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from gtmdb.api._base import EntityAPI
+from gtmdb.api._common import optional_reasoning, require_non_empty_str
 from gtmdb.api.models import Score
 from gtmdb.scope import Scope
 from gtmdb.types import EdgeData
@@ -15,21 +16,47 @@ class ScoresAPI(EntityAPI[Score]):
     _entity_cls = Score
 
     async def create(self, scope: Scope, **kwargs: Any) -> Score:
-        has_score_reasoning = kwargs.pop("has_score_reasoning", None)
-        lead_id = kwargs.get("lead_id")
-        lid = (str(lead_id).strip() if lead_id is not None else "")
-        if not lid:
-            raise ValueError("lead_id is required to create a Score")
-        kwargs["lead_id"] = lid
+        raise TypeError(
+            "Scores are created via LeadsAPI.add_score(...), not ScoresAPI.create"
+        )
+
+    async def _create_for_lead(
+        self,
+        scope: Scope,
+        *,
+        lead_id: str,
+        actor_id: str,
+        has_score_reasoning: str,
+        creation_reasoning: str | None = None,
+        **kwargs: Any,
+    ) -> Score:
+        """Internal: create Score + HAS_SCORE after lead validation."""
+        lid = require_non_empty_str(lead_id, "lead_id")
+        aid = require_non_empty_str(actor_id, "actor_id")
+        rs_link = require_non_empty_str(has_score_reasoning, "has_score_reasoning")
+
         lead_node = await self._graph.get_node(scope, "Lead", lid)
         if lead_node is None:
             raise ValueError(f"Lead {lid} not found")
+
+        kwargs["lead_id"] = lid
         if kwargs.get("scored_by") in (None, ""):
-            kwargs["scored_by"] = scope.owner_id
-        result = await super().create(scope, **kwargs)
+            kwargs["scored_by"] = aid
+
+        st = str(kwargs.get("score_type") or "bant")
+        total = int(kwargs.get("total", 0))
+        kwargs["name"] = f"{st}:{total}"
+
+        result = await EntityAPI.create(
+            self,
+            scope,
+            actor_id=aid,
+            reasoning=optional_reasoning(creation_reasoning),
+            **kwargs,
+        )
         await self._graph.create_edge(
             scope,
-            EdgeData("HAS_SCORE", result.id, lid, reasoning=has_score_reasoning),
+            EdgeData("HAS_SCORE", result.id, lid, reasoning=rs_link),
         )
         return result
 

@@ -40,10 +40,13 @@ async def test_email_campaign_create_with_artifacts_creates_graph() -> None:
         ],
     )
 
-    lead = await db.leads.create(scope, company_name="Acme", first_name="Jane")
+    lead = await db.leads.create(
+        scope, actor_id=owner, company_name="Acme", first_name="Jane"
+    )
 
     out = await db.email_campaigns.create_with_artifacts(
         scope,
+        actor_id=owner,
         name="Q1 Nurture",
         from_name="Marketing",
         from_email="mkt@example.com",
@@ -52,6 +55,7 @@ async def test_email_campaign_create_with_artifacts_creates_graph() -> None:
             {"subject": "Follow up", "body": "Second touch"},
         ],
         lead_ids=[lead.id],
+        sourced_from_reasoning="Lead enrolled in nurture track",
     )
     ec = out["campaign"]
     assert ec.name == "Q1 Nurture"
@@ -113,6 +117,7 @@ async def test_emails_crud_smoke() -> None:
 
     em = await db.emails.create(
         scope,
+        actor_id=owner,
         subject="Standalone",
         body="Body text",
         state="draft",

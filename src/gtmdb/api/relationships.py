@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from gtmdb.api._common import require_non_empty_str
 from gtmdb.api.models import Relationship
 from gtmdb.graph.adapter import GraphAdapter
 from gtmdb.scope import Scope
@@ -28,16 +29,16 @@ class RelationshipsAPI:
         rel_type: str,
         to_id: str,
         *,
-        reasoning: str | None = None,
+        reasoning: str,
         **props: Any,
     ) -> Relationship:
         """Create a relationship between two tenant-scoped nodes."""
+        rs = require_non_empty_str(reasoning, "reasoning")
         pdict = dict(props)
-        edge = EdgeData(rel_type, from_id, to_id, pdict, reasoning=reasoning)
+        edge = EdgeData(rel_type, from_id, to_id, pdict, reasoning=rs)
         await self._graph.create_edge(scope, edge)
         merged = dict(pdict)
-        if reasoning is not None and reasoning.strip():
-            merged["reasoning"] = reasoning.strip()
+        merged["reasoning"] = rs
         return Relationship(
             type=rel_type,
             from_id=from_id,

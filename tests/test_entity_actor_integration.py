@@ -40,7 +40,9 @@ async def test_lead_create_stamps_property_and_created_by_edge() -> None:
         ],
     )
 
-    lead = await db.leads.create(scope, company_name="Acme", first_name="Jane")
+    lead = await db.leads.create(
+        scope, actor_id=owner, company_name="Acme", first_name="Jane"
+    )
     assert lead.created_by_actor_id == owner
     assert lead.updated_by_actor_id is None
 
@@ -87,9 +89,13 @@ async def test_lead_update_stamps_property_and_two_updated_by_edges() -> None:
         ],
     )
 
-    lead = await db.leads.create(scope, company_name="Beta", first_name="Bob")
-    await db.leads.update(scope, lead.id, status="qualified")
-    await db.leads.update(scope, lead.id, status="won")
+    lead = await db.leads.create(
+        scope, actor_id=owner, company_name="Beta", first_name="Bob"
+    )
+    await db.leads.update(
+        scope, lead.id, actor_id=owner, status="qualified"
+    )
+    await db.leads.update(scope, lead.id, actor_id=owner, status="won")
 
     updated = await db.leads.get(scope, lead.id)
     assert updated is not None

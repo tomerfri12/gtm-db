@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from gtmdb.api._base import EntityAPI
+from gtmdb.api._common import require_non_empty_str
 from gtmdb.api.models import Campaign
 from gtmdb.scope import Scope
 from gtmdb.types import EdgeData
@@ -18,11 +19,12 @@ class CampaignsAPI(EntityAPI[Campaign]):
         campaign_id: str,
         deal_id: str,
         *,
-        reasoning: str | None = None,
+        reasoning: str,
     ) -> None:
         """Create an INFLUENCED edge from this campaign to a deal."""
+        rs = require_non_empty_str(reasoning, "reasoning")
         await self._graph.create_edge(
-            scope, EdgeData("INFLUENCED", campaign_id, deal_id, reasoning=reasoning),
+            scope, EdgeData("INFLUENCED", campaign_id, deal_id, reasoning=rs),
         )
 
     async def influenced_deals(

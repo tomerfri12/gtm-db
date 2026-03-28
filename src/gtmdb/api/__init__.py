@@ -5,13 +5,17 @@ Usage via GtmDB client::
     db = GtmDB()
     await db.connect()
 
-    lead = await db.leads.create(scope, first_name="Jane", company_name="Acme")
+    lead = await db.leads.create(
+        scope, actor_id="agent-1", first_name="Jane", company_name="Acme"
+    )
     lead = await db.leads.get(scope, lead.id)
     leads = await db.leads.list(scope, status="new", limit=50)
-    await db.leads.update(scope, lead.id, status="qualified")
+    await db.leads.update(scope, lead.id, actor_id="agent-1", status="qualified")
     await db.leads.delete(scope, lead.id)
 
-    await db.relationships.create(scope, lead.id, "WORKS_AT", account.id)
+    await db.relationships.create(
+        scope, lead.id, "WORKS_AT", account.id, reasoning="Enrichment match"
+    )
 """
 
 from gtmdb.api.accounts import AccountsAPI

@@ -6,6 +6,8 @@ import dataclasses
 from datetime import datetime, timezone
 from typing import Any, Generic, TypeVar
 
+from gtmdb.api._common import optional_reasoning, require_non_empty_str
+from gtmdb.api.actors import ActorsAPI
 from gtmdb.api.models import Entity
 from gtmdb.graph.adapter import GraphAdapter
 from gtmdb.scope import Scope
@@ -84,17 +86,22 @@ class EntityAPI(Generic[T]):
         kwargs.setdefault("created_at", now)
         kwargs.setdefault("updated_at", now)
 
-        reasoning = kwargs.pop("reasoning", None)
+        actor_id = kwargs.pop("actor_id", None)
+        reasoning = optional_reasoning(kwargs.pop("reasoning", None))
+        aid = require_non_empty_str(actor_id, "actor_id")
+
+        await ActorsAPI(self._graph).ensure(scope, aid)
 
         props = {
             k: v for k, v in kwargs.items()
             if k in self._domain_fields and v is not None
         }
+        props["created_by_actor_id"] = aid
 
         result = await self._graph.create_node(scope, self._to_node_data(props))
         await self._graph.create_edge(
             scope,
-            EdgeData("CREATED_BY", scope.owner_id, result.id, reasoning=reasoning),
+            EdgeData("CREATED_BY", aid, result.id, reasoning=reasoning),
         )
         return self._from_node_data(result)
 
@@ -162,7 +169,11 @@ class EntityAPI(Generic[T]):
                 f"Token {scope.owner_id} cannot write {self._label}"
             )
 
-        reasoning = kwargs.pop("reasoning", None)
+        actor_id = kwargs.pop("actor_id", None)
+        reasoning = optional_reasoning(kwargs.pop("reasoning", None))
+        aid = require_non_empty_str(actor_id, "actor_id")
+
+        await ActorsAPI(self._graph).ensure(scope, aid)
 
         updates = {k: v for k, v in kwargs.items() if k in self._domain_fields}
         if not updates:
@@ -170,7 +181,7 @@ class EntityAPI(Generic[T]):
 
         now = self._now_iso()
         updates["updated_at"] = now
-        updates["updated_by_actor_id"] = scope.owner_id
+        updates["updated_by_actor_id"] = aid
 
         set_parts: list[str] = []
         params: dict[str, Any] = {"id": entity_id}
@@ -193,7 +204,7 @@ class EntityAPI(Generic[T]):
             return None
         await self._graph.create_edge(
             scope,
-            EdgeData("UPDATED_BY", scope.owner_id, entity_id, {"at": now}, reasoning=reasoning),
+            EdgeData("UPDATED_BY", aid, entity_id, {"at": now}, reasoning=reasoning),
         )
         return self._from_raw_props(dict(records[0]["props"]), scope)
 

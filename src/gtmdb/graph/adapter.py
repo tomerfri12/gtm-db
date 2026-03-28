@@ -105,7 +105,13 @@ class GraphAdapter:
             **node.properties,
         }
         if node.label != "Actor":
-            props["created_by_actor_id"] = scope.owner_id
+            cid = (props.get("created_by_actor_id") or "").strip()
+            if not cid:
+                raise ValueError(
+                    "created_by_actor_id is required for non-Actor nodes "
+                    "(set on NodeData.properties before create_node)"
+                )
+            props["created_by_actor_id"] = cid
         async with self._driver.session() as session:
             result = await session.execute_write(
                 cypher_create_node, node.label, props

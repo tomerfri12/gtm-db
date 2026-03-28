@@ -524,22 +524,49 @@ await db.close()</code></pre>
       <table>
         <thead><tr><th>Method</th><th>Parameters</th><th>Returns / notes</th></tr></thead>
         <tbody>
-          <tr><td><code class="method">create</code></td><td><code>scope</code>, <strong>**kwargs</strong> domain fields</td><td>Typed entity; <code>id</code>, <code>tenant_id</code>, timestamps set automatically</td></tr>
+          <tr><td><code class="method">create</code></td><td><code>scope</code>, required <code>actor_id</code>, optional <code>reasoning</code> (audit edge), <strong>**kwargs</strong> domain fields</td><td>Typed entity; MERGE <code>Actor</code>; <code>CREATED_BY</code> from actor</td></tr>
           <tr><td><code class="method">get</code></td><td><code>scope</code>, <code>entity_id: str</code></td><td>Entity or <code>None</code></td></tr>
           <tr><td><code class="method">list</code></td><td><code>scope</code>, <code>limit=50</code>, <code>offset=0</code>, <strong>**filters</strong> (equality on domain fields)</td><td><code>list</code> of entities</td></tr>
-          <tr><td><code class="method">update</code></td><td><code>scope</code>, <code>entity_id</code>, <strong>**kwargs</strong> (PATCH)</td><td>Entity or <code>None</code>; sets <code>updated_at</code></td></tr>
+          <tr><td><code class="method">update</code></td><td><code>scope</code>, <code>entity_id</code>, required <code>actor_id</code>, optional <code>reasoning</code>, <strong>**kwargs</strong> (PATCH)</td><td>Entity or <code>None</code>; <code>UPDATED_BY</code> from actor</td></tr>
           <tr><td><code class="method">delete</code></td><td><code>scope</code>, <code>entity_id</code></td><td><code>bool</code> — removed</td></tr>
         </tbody>
       </table>
-      <pre><code>lead = await db.leads.create(
+      <h3 id="entity-actor-reasoning"><code>actor_id</code>, audit edges, and tiered <code>reasoning</code></h3>
+      <p>
+        <strong><code>actor_id</code></strong> (required, non-empty) on every <code>create</code> / <code>update</code> identifies the
+        <code>Actor</code> performing the write. The API MERGEs that <code>Actor</code>, sets <code>created_by_actor_id</code> /
+        <code>updated_by_actor_id</code> on the node, and creates <strong><code>(Actor)-[:CREATED_BY|:UPDATED_BY]-&gt;(entity)</code></strong>
+        (direction: actor → entity). Optional keyword <code>reasoning</code> on create/update is stored on that audit relationship when non-empty.
+      </p>
+      <p>
+        <strong>Score domain <code>reasoning</code></strong> (qualification notes on the <code>Score</code> node) is separate from
+        relationship <code>reasoning</code>. Create scores only via <code>db.leads.add_score(..., has_score_reasoning=..., reasoning=None, ...)</code>;
+        <code>ScoresAPI.create</code> is not supported (raises <code>TypeError</code>).
+      </p>
+      <p><strong>Display <code>name</code> on nodes:</strong> Lead / Contact — composed person name with fallbacks to company / email;
+        Email — subject or <code>Email step {n}</code>; Score — <code>{score_type}:{total}</code> from <code>add_score</code>; Deal, Account, Campaign — the <code>name</code> field you set.</p>
+      <p><strong>Edge <code>reasoning</code> — required (non-empty) on:</strong>
+        <code>relationships.create</code>; <code>leads.assign_to_account</code>, <code>leads.link_campaign</code>;
+        <code>contacts.assign_to_account</code>; <code>deals.assign_to_account</code>, <code>deals.add_contact</code>, <code>deals.add_campaign</code>;
+        <code>campaigns.link_deal</code>; <code>leads.add_score</code> (<code>has_score_reasoning</code> for <code>HAS_SCORE</code>);
+        and <code>email_campaigns.create_with_artifacts</code> when <code>lead_ids</code> is non-empty (<code>sourced_from_reasoning</code>).
+      </p>
+      <p><strong>Optional</strong> on: <code>HAS_EMAIL</code> in <code>create_with_artifacts</code> (<code>has_email_reasoning</code>);
+        arbitrary low-level <code>EdgeData</code>; and purely structural edges you create yourself.</p>
+
+      <pre><code>ACTOR = "my-agent-id"  # must exist or will be MERGEd as Actor
+
+lead = await db.leads.create(
     scope,
+    actor_id=ACTOR,
+    reasoning="Imported from form",  # optional; CREATED_BY edge
     company_name="Acme",
     first_name="Jane",
     status="new",
 )
 row = await db.leads.get(scope, lead.id)
 rows = await db.leads.list(scope, status="new", limit=20)
-await db.leads.update(scope, lead.id, status="qualified")
+await db.leads.update(scope, lead.id, actor_id=ACTOR, status="qualified")
 await db.leads.delete(scope, lead.id)</code></pre>
 
       <h2 id="accounts">Account <code>db.accounts</code></h2>
@@ -564,6 +591,7 @@ await db.leads.delete(scope, lead.id)</code></pre>
 # scope = Scope(token)  # see #permissions
 acc = await db.accounts.create(
     scope,
+    actor_id=ACTOR,
     name="Acme Industries",
     domain="acme.example",
     industry="Software",
@@ -575,7 +603,7 @@ acc = await db.accounts.create(
 loaded: Account | None = await db.accounts.get(scope, acc.id)
 same_tenant = await db.accounts.list(scope, domain="acme.example", limit=10)
 
-await db.accounts.update(scope, acc.id, annual_revenue=5_000_000.0)
+await db.accounts.update(scope, acc.id, actor_id=ACTOR, annual_revenue=5_000_000.0)
 removed = await db.accounts.delete(scope, acc.id)  # bool</code></pre>
 
       <h2 id="contacts">Contact <code>db.contacts</code></h2>
@@ -586,28 +614,31 @@ removed = await db.accounts.delete(scope, acc.id)  # bool</code></pre>
         <code>for_account</code> to list everyone at a company.
       </p>
       <p><strong>Python type:</strong> <code>from crmdb import Contact</code> —
-        <code>first_name</code>, <code>last_name</code>, <code>email</code>, <code>phone</code>,
+        <code>name</code> (auto-set on create/update), <code>first_name</code>, <code>last_name</code>, <code>email</code>, <code>phone</code>,
         <code>title</code>, <code>company_name</code>, <code>department</code>, <code>linkedin_url</code>,
         plus system fields on <code>Entity</code>.
       </p>
-      <p><strong>Extra methods:</strong> <code>assign_to_account(scope, contact_id, account_id)</code>,
+      <p><strong>Extra methods:</strong> <code>assign_to_account(scope, contact_id, account_id, *, reasoning)</code> — <code>reasoning</code> required,
         <code>for_account(scope, account_id, limit=50)</code>.
       </p>
       <pre><code>from crmdb import Contact, CrmDB, Scope
 
 person = await db.contacts.create(
     scope,
+    actor_id=ACTOR,
     first_name="Jane",
     last_name="Doe",
     email="jane@acme.example",
     title="VP Sales",
     company_name="Acme Industries",
 )
-await db.contacts.assign_to_account(scope, person.id, acc.id)
+await db.contacts.assign_to_account(
+    scope, person.id, acc.id, reasoning="HR directory match"
+)
 
 team: list[Contact] = await db.contacts.for_account(scope, acc.id, limit=100)
 one = await db.contacts.get(scope, person.id)
-await db.contacts.update(scope, person.id, department="Revenue")
+await db.contacts.update(scope, person.id, actor_id=ACTOR, department="Revenue")
 await db.contacts.delete(scope, person.id)</code></pre>
 
       <h2 id="leads">Lead <code>db.leads</code></h2>
@@ -625,14 +656,16 @@ await db.contacts.delete(scope, person.id)</code></pre>
         <code>phone</code>, <code>title</code>, <code>domain</code>, <code>status</code>,
         <code>source</code>, <code>score</code>, <code>linkedin_url</code>.
       </p>
-      <p><strong>Extra methods:</strong> <code>assign_to_account</code>, <code>for_account</code>
+      <p><strong>Extra methods:</strong> <code>assign_to_account(..., *, reasoning)</code>, <code>for_account</code>
         (same pattern as contacts; relationship type <code>WORKS_AT</code> lead → account);
-        <code>link_campaign(scope, lead_id, campaign_id)</code> — <code>SOURCED_FROM</code> lead → campaign.
+        <code>link_campaign(..., *, reasoning)</code> — <code>SOURCED_FROM</code> lead → campaign;
+        <code>add_score(..., *, actor_id, has_score_reasoning, reasoning=None, **score_fields)</code> — creates <code>Score</code> + <code>HAS_SCORE</code>.
       </p>
       <pre><code>from crmdb import Lead, CrmDB, Scope
 
 prospect = await db.leads.create(
     scope,
+    actor_id=ACTOR,
     company_name="Beta Corp",
     first_name="Sam",
     last_name="Lee",
@@ -640,12 +673,18 @@ prospect = await db.leads.create(
     source="webinar",
     score=42.0,
 )
-await db.leads.assign_to_account(scope, prospect.id, acc.id)
-cmp = await db.campaigns.create(scope, name="Webinar series", channel="webinar")
-await db.leads.link_campaign(scope, prospect.id, cmp.id)
+await db.leads.assign_to_account(
+    scope, prospect.id, acc.id, reasoning="Clear firmographic match"
+)
+cmp = await db.campaigns.create(
+    scope, actor_id=ACTOR, name="Webinar series", channel="webinar"
+)
+await db.leads.link_campaign(
+    scope, prospect.id, cmp.id, reasoning="Registered for webinar"
+)
 
 queue = await db.leads.list(scope, status="new", limit=50, offset=0)
-await db.leads.update(scope, prospect.id, status="qualified")
+await db.leads.update(scope, prospect.id, actor_id=ACTOR, status="qualified")
 await db.leads.delete(scope, prospect.id)</code></pre>
 
       <h2 id="deals">Deal <code>db.deals</code></h2>
@@ -664,6 +703,7 @@ await db.leads.delete(scope, prospect.id)</code></pre>
 
 opp = await db.deals.create(
     scope,
+    actor_id=ACTOR,
     name="Acme — Enterprise renewal",
     amount=120_000,
     stage="negotiation",
@@ -671,18 +711,22 @@ opp = await db.deals.create(
     close_date="2026-06-30",
     owner_id="rep-42",
 )
-await db.deals.assign_to_account(scope, opp.id, acc.id)
-await db.deals.add_contact(scope, opp.id, person.id)
+await db.deals.assign_to_account(
+    scope, opp.id, acc.id, reasoning="Renewal on existing customer"
+)
+await db.deals.add_contact(
+    scope, opp.id, person.id, reasoning="Economic buyer on opportunity"
+)
 
 open_at_acme: list[Deal] = await db.deals.for_account(scope, acc.id)
-await db.deals.update(scope, opp.id, stage="closed_won")
+await db.deals.update(scope, opp.id, actor_id=ACTOR, stage="closed_won")
 await db.deals.delete(scope, opp.id)</code></pre>
       <table>
         <thead><tr><th>Method</th><th>Parameters</th><th>Edge</th></tr></thead>
         <tbody>
-          <tr><td><code class="method">assign_to_account</code></td><td><code>scope</code>, <code>deal_id</code>, <code>account_id</code></td><td><code>BELONGS_TO</code> deal → account</td></tr>
-          <tr><td><code class="method">add_contact</code></td><td><code>scope</code>, <code>deal_id</code>, <code>contact_id</code></td><td><code>HAS_CONTACT</code></td></tr>
-          <tr><td><code class="method">add_campaign</code></td><td><code>scope</code>, <code>deal_id</code>, <code>campaign_id</code></td><td><code>INFLUENCED</code> (campaign → deal)</td></tr>
+          <tr><td><code class="method">assign_to_account</code></td><td><code>scope</code>, <code>deal_id</code>, <code>account_id</code>, <code>reasoning</code></td><td><code>BELONGS_TO</code> deal → account</td></tr>
+          <tr><td><code class="method">add_contact</code></td><td><code>scope</code>, <code>deal_id</code>, <code>contact_id</code>, <code>reasoning</code></td><td><code>HAS_CONTACT</code></td></tr>
+          <tr><td><code class="method">add_campaign</code></td><td><code>scope</code>, <code>deal_id</code>, <code>campaign_id</code>, <code>reasoning</code></td><td><code>INFLUENCED</code> (campaign → deal)</td></tr>
           <tr><td><code class="method">for_account</code></td><td><code>scope</code>, <code>account_id</code>, <code>limit=50</code></td><td>query helper</td></tr>
         </tbody>
       </table>
@@ -703,12 +747,15 @@ await db.deals.delete(scope, opp.id)</code></pre>
 
 cmp = await db.campaigns.create(
     scope,
+    actor_id=ACTOR,
     name="Q1 Outbound",
     status="active",
     channel="email",
     budget=25_000,
 )
-await db.campaigns.link_deal(scope, cmp.id, opp.id)  # opp = existing Deal
+await db.campaigns.link_deal(
+    scope, cmp.id, opp.id, reasoning="Campaign touched this pipeline"
+)  # opp = existing Deal
 
 influenced = await db.campaigns.influenced_deals(scope, cmp.id, limit=20)
 # list of {"deal": Deal}
@@ -716,7 +763,7 @@ await db.campaigns.delete(scope, cmp.id)</code></pre>
       <table>
         <thead><tr><th>Method</th><th>Parameters</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code class="method">link_deal</code></td><td><code>scope</code>, <code>campaign_id</code>, <code>deal_id</code></td><td><code>INFLUENCED</code> campaign → deal</td></tr>
+          <tr><td><code class="method">link_deal</code></td><td><code>scope</code>, <code>campaign_id</code>, <code>deal_id</code>, <code>reasoning</code></td><td><code>INFLUENCED</code> campaign → deal</td></tr>
           <tr><td><code class="method">influenced_deals</code></td><td><code>scope</code>, <code>campaign_id</code>, <code>limit=50</code></td><td><code>list[dict]</code> with <code>{"deal": Deal}</code></td></tr>
         </tbody>
       </table>
@@ -739,6 +786,7 @@ await db.campaigns.delete(scope, cmp.id)</code></pre>
 
 out = await db.email_campaigns.create_with_artifacts(
     scope,
+    actor_id=ACTOR,
     name="Q1 Nurture",
     from_name="Marketing",
     from_email="mkt@example.com",
@@ -746,14 +794,15 @@ out = await db.email_campaigns.create_with_artifacts(
         {"subject": "Hello", "body": "First touch"},
         {"subject": "Follow up", "body": "Second touch"},
     ],
-    lead_ids=["uuid-of-existing-lead"],  # optional
+    lead_ids=["uuid-of-existing-lead"],  # optional; if set, sourced_from_reasoning required
+    sourced_from_reasoning="Enrolled from inbound",
 )
 ec = out["campaign"]
 # out["email_ids"], out["linked_lead_count"]</code></pre>
       <table>
         <thead><tr><th>Method</th><th>Parameters</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code class="method">create_with_artifacts</code></td><td><code>scope</code>, <code>emails</code> (list of dicts), optional <code>lead_ids</code>, plus EmailCampaign domain kwargs (<code>name</code>, …)</td><td>Persist <code>EmailCampaign</code> + <code>Email</code>s + <code>HAS_EMAIL</code>; optional <code>SOURCED_FROM</code> from leads (does not send mail)</td></tr>
+          <tr><td><code class="method">create_with_artifacts</code></td><td><code>scope</code>, required <code>actor_id</code>, <code>emails</code>, optional <code>lead_ids</code>, <code>sourced_from_reasoning</code> (required if <code>lead_ids</code>), optional <code>has_email_reasoning</code>, plus campaign kwargs</td><td>Persist <code>EmailCampaign</code> + <code>Email</code>s + edges (does not send mail)</td></tr>
           <tr><td colspan="3">Also standard <code>create</code> / <code>get</code> / <code>list</code> / <code>update</code> / <code>delete</code> from the entity pattern.</td></tr>
         </tbody>
       </table>
@@ -777,12 +826,18 @@ ec = out["campaign"]
       <p>Typical order: create <strong>Account</strong>, then <strong>Contact</strong> and
         <code>assign_to_account</code>, then <strong>Deal</strong>, <code>assign_to_account</code> on the
         deal, and <code>add_contact</code> on the deal.</p>
-      <pre><code>acc = await db.accounts.create(scope, name="Acme", domain="acme.example")
-c = await db.contacts.create(scope, first_name="Jane", last_name="Doe", email="j@acme.example")
-await db.contacts.assign_to_account(scope, c.id, acc.id)
-d = await db.deals.create(scope, name="Acme expansion", amount=50_000, stage="qualification")
-await db.deals.assign_to_account(scope, d.id, acc.id)
-await db.deals.add_contact(scope, d.id, c.id)</code></pre>
+      <pre><code>acc = await db.accounts.create(scope, actor_id=ACTOR, name="Acme", domain="acme.example")
+c = await db.contacts.create(
+    scope, actor_id=ACTOR, first_name="Jane", last_name="Doe", email="j@acme.example"
+)
+await db.contacts.assign_to_account(
+    scope, c.id, acc.id, reasoning="Employed at account"
+)
+d = await db.deals.create(
+    scope, actor_id=ACTOR, name="Acme expansion", amount=50_000, stage="qualification"
+)
+await db.deals.assign_to_account(scope, d.id, acc.id, reasoning="Opportunity on account")
+await db.deals.add_contact(scope, d.id, c.id, reasoning="Champion on deal")</code></pre>
 
       <h2 id="entity-roadmap">GTM entity model</h2>
       <p class="lead">
@@ -898,13 +953,12 @@ await db.deals.add_contact(scope, d.id, c.id)</code></pre>
       <table>
         <thead><tr><th>Method</th><th>Parameters</th><th>Returns</th></tr></thead>
         <tbody>
-          <tr><td><code class="method">create</code></td><td><code>scope</code>, <code>from_id</code>, <code>rel_type</code>, <code>to_id</code>, optional <code>reasoning=None</code>, <strong>**props</strong></td><td><code>Relationship</code> (includes stored rel properties, e.g. <code>reasoning</code>)</td></tr>
+          <tr><td><code class="method">create</code></td><td><code>scope</code>, <code>from_id</code>, <code>rel_type</code>, <code>to_id</code>, required <code>reasoning</code>, <strong>**props</strong></td><td><code>Relationship</code> (includes stored rel properties, e.g. <code>reasoning</code>)</td></tr>
           <tr><td><code class="method">list</code></td><td><code>scope</code>, <code>node_id</code>, <code>rel_type=None</code>, <code>direction="both"</code> (<code>out</code>|<code>in</code>|<code>both</code>), <code>limit=100</code></td><td><code>list[Relationship]</code></td></tr>
           <tr><td><code class="method">delete</code></td><td><code>scope</code>, <code>from_id</code>, <code>rel_type</code>, <code>to_id</code></td><td><code>bool</code></td></tr>
         </tbody>
       </table>
-      <pre><code>await db.relationships.create(scope, lead_id, "WORKS_AT", account_id)
-await db.relationships.create(
+      <pre><code>await db.relationships.create(
     scope, lead_id, "WORKS_AT", account_id, reasoning="Matched company domain in enrichment"
 )
 rels = await db.relationships.list(scope, node_id, rel_type="WORKS_AT", direction="out")
@@ -912,17 +966,17 @@ await db.relationships.delete(scope, lead_id, "WORKS_AT", account_id)</code></pr
 
       <h3 id="edge-reasoning">Relationship properties &amp; <code>reasoning</code></h3>
       <p>
-        Many edge-creating APIs accept an optional keyword argument <code>reasoning</code> (short text).
-        It is stored on the Neo4j relationship as the property <code>reasoning</code> (merged with any
-        other relationship properties). Use it to record <em>why</em> an edge was created (agent or human).
+        <code>EdgeData</code> and <code>db.create_edge</code> accept optional <code>reasoning</code>; when non-empty it is stored on the relationship.
+        Typed APIs enforce <strong>non-empty</strong> <code>reasoning</code> where business judgment applies — see
+        <a href="#entity-actor-reasoning"><code>actor_id</code>, audit edges, and tiered <code>reasoning</code></a>.
       </p>
       <ul class="params">
-        <li><code>EdgeData(..., reasoning="…")</code> or <code>db.create_edge(scope, EdgeData(..., reasoning="…"))</code></li>
-        <li><code>relationships.create(..., reasoning="…", **props)</code> — explicit <code>reasoning</code> wins over a <code>reasoning</code> key inside <code>**props</code> if both are set.</li>
-        <li>Entity <code>create</code> / <code>update</code>: reserved kwarg <code>reasoning</code> applies to the <code>CREATED_BY</code> / <code>UPDATED_BY</code> audit edge.</li>
-        <li>Typed helpers: <code>leads.assign_to_account</code>, <code>leads.link_campaign</code>, <code>contacts.assign_to_account</code>, <code>deals.assign_to_account</code>, <code>deals.add_contact</code>, <code>deals.add_campaign</code>, <code>campaigns.link_deal</code> — each accepts <code>reasoning=None</code>.</li>
-        <li><code>scores.create</code> — use <code>has_score_reasoning</code> for the <code>HAS_SCORE</code> edge (plus optional <code>reasoning</code> on <code>CREATED_BY</code> via the entity API).</li>
-        <li><code>email_campaigns.create_with_artifacts</code> — <code>has_email_reasoning</code> (every <code>HAS_EMAIL</code> in the batch), <code>sourced_from_reasoning</code> (each <code>SOURCED_FROM</code> from leads).</li>
+        <li><code>EdgeData(..., reasoning="…")</code> or <code>db.create_edge(scope, EdgeData(..., reasoning="…"))</code> — optional unless your caller contract says otherwise.</li>
+        <li><code>relationships.create(..., reasoning="…", **props)</code> — <code>reasoning</code> is <strong>required</strong> and non-empty.</li>
+        <li>Entity <code>create</code> / <code>update</code>: optional <code>reasoning</code> on the <code>CREATED_BY</code> / <code>UPDATED_BY</code> audit edge (from <code>actor_id</code>).</li>
+        <li>Typed CRM helpers listed under tiered rules — required <code>reasoning</code> (or <code>has_score_reasoning</code> / <code>sourced_from_reasoning</code> where noted).</li>
+        <li><code>leads.add_score</code> — required <code>has_score_reasoning</code> for <code>HAS_SCORE</code>; optional <code>reasoning</code> for <code>CREATED_BY</code> on the score node; domain qualification text is the Score field <code>reasoning</code> in <strong>**kwargs</strong>.</li>
+        <li><code>email_campaigns.create_with_artifacts</code> — optional <code>has_email_reasoning</code>; if <code>lead_ids</code> non-empty, <code>sourced_from_reasoning</code> is required.</li>
       </ul>
       <p>
         <code>relationships.list</code> returns each relationship’s <code>properties</code> dict (including <code>reasoning</code> when present).
@@ -933,7 +987,7 @@ await db.relationships.delete(scope, lead_id, "WORKS_AT", account_id)</code></pr
       <table>
         <thead><tr><th>Method</th><th>Parameters</th><th>Notes</th></tr></thead>
         <tbody>
-          <tr><td><code class="method">create_node</code></td><td><code>scope</code>, <code>node: NodeData</code></td><td>Arbitrary label + properties</td></tr>
+          <tr><td><code class="method">create_node</code></td><td><code>scope</code>, <code>node: NodeData</code>, required kw <code>actor_id</code>, optional <code>reasoning</code></td><td>Sets <code>created_by_actor_id</code>, <code>CREATED_BY</code> (skipped for label <code>Actor</code>)</td></tr>
           <tr><td><code class="method">create_edge</code></td><td><code>scope</code>, <code>edge: EdgeData</code></td><td><code>type</code>, <code>from_id</code>, <code>to_id</code>, optional <code>properties</code>, optional <code>reasoning</code> (stored as rel property)</td></tr>
           <tr><td><code class="method">get_node</code></td><td><code>scope</code>, <code>label</code>, <code>node_id</code></td><td><code>NodeData | None</code></td></tr>
           <tr><td><code class="method">get_neighbors</code></td><td><code>scope</code>, <code>node_id</code>, <code>edge_types=None</code>, <code>direction="both"</code></td><td>List of dicts: <code>node</code>, <code>edge_type</code>, <code>edge_properties</code> (relationship props, e.g. <code>reasoning</code>)</td></tr>
@@ -942,7 +996,9 @@ await db.relationships.delete(scope, lead_id, "WORKS_AT", account_id)</code></pr
       </table>
       <pre><code>from gtmdb.types import NodeData, EdgeData
 
-node = await db.create_node(scope, NodeData("Tag", "", "", {"name": "hot"}))
+node = await db.create_node(
+    scope, NodeData("Tag", "", "", {"name": "hot"}), actor_id=ACTOR, reasoning="Bootstrap"
+)
 edge = await db.create_edge(scope, EdgeData("TAGGED", from_id, to_id, reasoning="Tagged after review"))</code></pre>
 
       <h2 id="traversals">Read APIs (traversals)</h2>
@@ -1169,6 +1225,7 @@ scope = Scope(token)</code></pre>
       <h3 id="token-scope-example">Example: token → scope → call</h3>
       <pre><code>import uuid
 from crmdb import create_token_from_presets, Scope, CrmDB
+from crmdb import ActorSpec
 
 tenant = uuid.UUID("00000000-0000-4000-8000-000000000001")
 token = create_token_from_presets(
@@ -1183,7 +1240,13 @@ scope = Scope(token)
 
 db = CrmDB()
 await db.connect()
-lead = await db.leads.create(scope, company_name="Acme", status="new")
+await db.actors.create(
+    scope,
+    [ActorSpec(id="demand-gen-agent", kind="ai", display_name="Demand gen")],
+)
+lead = await db.leads.create(
+    scope, actor_id="demand-gen-agent", company_name="Acme", status="new"
+)
 await db.close()</code></pre>
       <p>
         For production, persist <code>AccessToken</code> rows via SQLAlchemy, load the row, and construct

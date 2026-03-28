@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from gtmdb.api._base import EntityAPI
+from gtmdb.api._common import require_non_empty_str
 from gtmdb.api.models import Deal
 from gtmdb.scope import Scope
 from gtmdb.types import EdgeData
@@ -18,11 +19,12 @@ class DealsAPI(EntityAPI[Deal]):
         deal_id: str,
         account_id: str,
         *,
-        reasoning: str | None = None,
+        reasoning: str,
     ) -> None:
         """Create a BELONGS_TO edge from this deal to an account."""
+        rs = require_non_empty_str(reasoning, "reasoning")
         await self._graph.create_edge(
-            scope, EdgeData("BELONGS_TO", deal_id, account_id, reasoning=reasoning),
+            scope, EdgeData("BELONGS_TO", deal_id, account_id, reasoning=rs),
         )
 
     async def add_contact(
@@ -31,11 +33,12 @@ class DealsAPI(EntityAPI[Deal]):
         deal_id: str,
         contact_id: str,
         *,
-        reasoning: str | None = None,
+        reasoning: str,
     ) -> None:
         """Create a HAS_CONTACT edge from this deal to a contact."""
+        rs = require_non_empty_str(reasoning, "reasoning")
         await self._graph.create_edge(
-            scope, EdgeData("HAS_CONTACT", deal_id, contact_id, reasoning=reasoning),
+            scope, EdgeData("HAS_CONTACT", deal_id, contact_id, reasoning=rs),
         )
 
     async def add_campaign(
@@ -44,11 +47,12 @@ class DealsAPI(EntityAPI[Deal]):
         deal_id: str,
         campaign_id: str,
         *,
-        reasoning: str | None = None,
+        reasoning: str,
     ) -> None:
         """Link a campaign to this deal via INFLUENCED (campaign -> deal)."""
+        rs = require_non_empty_str(reasoning, "reasoning")
         await self._graph.create_edge(
-            scope, EdgeData("INFLUENCED", campaign_id, deal_id, reasoning=reasoning),
+            scope, EdgeData("INFLUENCED", campaign_id, deal_id, reasoning=rs),
         )
 
     async def for_account(

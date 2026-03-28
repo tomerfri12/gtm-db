@@ -48,6 +48,7 @@ class Lead(Entity):
 class Score(Entity):
     """Qualification score (e.g. BANT) linked to a Lead via HAS_SCORE."""
 
+    name: str | None = None
     lead_id: str | None = None
     score_type: str = "bant"
     total: int = 0
@@ -73,6 +74,7 @@ class Account(Entity):
 
 @dataclass
 class Contact(Entity):
+    name: str | None = None
     first_name: str | None = None
     last_name: str | None = None
     email: str | None = None
@@ -121,6 +123,7 @@ class EmailCampaign(Campaign):
 class Email(Entity):
     """Single email artifact (sequence step, draft, or sent record)."""
 
+    name: str | None = None
     subject: str | None = None
     body: str | None = None
     from_name: str | None = None

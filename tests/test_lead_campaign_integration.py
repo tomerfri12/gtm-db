@@ -40,10 +40,19 @@ async def test_link_lead_to_campaign_creates_sourced_from_edge() -> None:
         ],
     )
 
-    campaign = await db.campaigns.create(scope, name="Q1 Webinar", channel="webinar")
-    lead = await db.leads.create(scope, company_name="Acme", first_name="Jane")
+    campaign = await db.campaigns.create(
+        scope, actor_id=owner, name="Q1 Webinar", channel="webinar"
+    )
+    lead = await db.leads.create(
+        scope, actor_id=owner, company_name="Acme", first_name="Jane"
+    )
 
-    await db.leads.link_campaign(scope, lead.id, campaign.id)
+    await db.leads.link_campaign(
+        scope,
+        lead.id,
+        campaign.id,
+        reasoning="Lead registered for webinar program",
+    )
 
     recs = await db.execute_cypher(
         scope,
