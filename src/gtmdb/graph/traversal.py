@@ -350,16 +350,22 @@ async def cypher_explore_subgraph_bundle(
             }
         )
 
+    # Expand only from nodes with dist < d (same as BFS frontiers). O(total degree)
+    # instead of O(n^2) pair UNWIND — critical for hub nodes.
+    allowed_ids = [nr["id"] for nr in node_rows]
+    expandable_ids = [nr["id"] for nr in node_rows if nr["dist"] < d]
     q2 = (
-        "UNWIND $node_rows AS nr1 "
-        "UNWIND $node_rows AS nr2 "
-        "WITH nr1, nr2 WHERE nr1.id <> nr2.id "
-        "MATCH (a {id: nr1.id, tenant_id: $tid})-[r]->(b {id: nr2.id, tenant_id: $tid}) "
-        "WHERE nr1.dist < $maxd OR nr2.dist < $maxd "
-        "RETURN collect(DISTINCT {from_id: a.id, to_id: b.id, rel_type: type(r), "
-        "rel_props: properties(r)}) AS edges"
+        "UNWIND $expandable AS eid "
+        "MATCH (a {id: eid, tenant_id: $tid})-[r]-(b {tenant_id: $tid}) "
+        "WHERE b.id IN $allowed_ids "
+        "WITH startNode(r).id AS fid, endNode(r).id AS to_nid, type(r) AS rtype, "
+        "properties(r) AS rprops "
+        "RETURN collect(DISTINCT {from_id: fid, to_id: to_nid, rel_type: rtype, "
+        "rel_props: rprops}) AS edges"
     )
-    result2 = await tx.run(q2, node_rows=node_rows, tid=tenant_id, maxd=d)
+    result2 = await tx.run(
+        q2, expandable=expandable_ids, allowed_ids=allowed_ids, tid=tenant_id
+    )
     rec2 = await result2.single()
     edges_out: list[dict[str, Any]] = []
     if rec2 and rec2.get("edges"):
