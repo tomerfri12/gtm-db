@@ -61,6 +61,32 @@ _LIST_COLUMNS = [
     api_keys_table.c.last_used_at,
 ]
 
+activity_log_table = sa.Table(
+    "gtmdb_activity_log",
+    metadata,
+    sa.Column("id", sa.Uuid, primary_key=True, default=uuid.uuid4),
+    sa.Column(
+        "timestamp",
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.func.now(),
+    ),
+    sa.Column("tenant_id", sa.Uuid, nullable=True, index=True),
+    sa.Column("owner_type", sa.String(50), nullable=True),
+    sa.Column("owner_id", sa.String(255), nullable=True, index=True),
+    sa.Column("key_id", sa.String(32), nullable=False, index=True),
+    sa.Column("method", sa.String(16), nullable=False),
+    sa.Column("path", sa.Text, nullable=False),
+    sa.Column("status_code", sa.Integer, nullable=False),
+    sa.Column("action", sa.String(32), nullable=True),
+    sa.Column("entity_type", sa.String(64), nullable=True),
+    sa.Column("entity_id", sa.String(64), nullable=True),
+    sa.Column("reasoning", sa.Text, nullable=True),
+    sa.Column("duration_ms", sa.Integer, nullable=False),
+    sa.Column("error_detail", sa.Text, nullable=True),
+    sa.Column("ip_address", sa.String(64), nullable=True),
+)
+
 
 class KeyStore:
     """Low-level async Postgres accessor for the ``gtmdb_api_keys`` table."""
@@ -117,3 +143,55 @@ class KeyStore:
         async with self._engine.connect() as conn:
             result = await conn.execute(stmt)
             return [dict(r) for r in result.mappings().all()]
+
+    async def insert_activity_log(self, row: dict[str, Any]) -> None:
+        async with self._engine.begin() as conn:
+            await conn.execute(activity_log_table.insert().values(**row))
+
+    async def list_activity_log(
+        self,
+        *,
+        tenant_id: str | None = None,
+        owner_id: str | None = None,
+        key_id: str | None = None,
+        action: str | None = None,
+        entity_type: str | None = None,
+        from_ts: datetime | None = None,
+        to_ts: datetime | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        stmt = sa.select(activity_log_table).order_by(
+            activity_log_table.c.timestamp.desc()
+        )
+        if tenant_id is not None:
+            stmt = stmt.where(
+                activity_log_table.c.tenant_id == uuid.UUID(tenant_id)
+            )
+        if owner_id is not None:
+            stmt = stmt.where(activity_log_table.c.owner_id == owner_id)
+        if key_id is not None:
+            stmt = stmt.where(activity_log_table.c.key_id == key_id)
+        if action is not None:
+            stmt = stmt.where(activity_log_table.c.action == action)
+        if entity_type is not None:
+            stmt = stmt.where(activity_log_table.c.entity_type == entity_type)
+        if from_ts is not None:
+            stmt = stmt.where(activity_log_table.c.timestamp >= from_ts)
+        if to_ts is not None:
+            stmt = stmt.where(activity_log_table.c.timestamp <= to_ts)
+        lim = max(1, min(int(limit), 500))
+        off = max(0, int(offset))
+        stmt = stmt.limit(lim).offset(off)
+
+        async with self._engine.connect() as conn:
+            result = await conn.execute(stmt)
+            rows = []
+            for r in result.mappings().all():
+                d = dict(r)
+                if d.get("tenant_id") is not None:
+                    d["tenant_id"] = str(d["tenant_id"])
+                if d.get("id") is not None:
+                    d["id"] = str(d["id"])
+                rows.append(d)
+            return rows

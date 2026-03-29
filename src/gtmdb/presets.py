@@ -59,6 +59,7 @@ def create_token_from_presets(
     extra_policies: list[dict[str, Any]] | None = None,
     custom_presets: dict[str, list[dict[str, Any]]] | None = None,
     label: str = "",
+    key_id: str | None = None,
     redact_mode: str = "hint",
     is_active: bool = True,
 ) -> AccessToken:
@@ -80,6 +81,7 @@ def create_token_from_presets(
         owner_type=owner_type,
         label=label,
         policies=json.dumps(policies),
+        key_id=key_id,
         redact_mode=redact_mode,
         is_active=is_active,
     )

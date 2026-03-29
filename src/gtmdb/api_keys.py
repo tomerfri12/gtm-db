@@ -48,6 +48,17 @@ def _parse_key(raw_key: str) -> str:
     return parts[1]
 
 
+def key_id_from_raw_for_log(raw: str) -> str:
+    """Best-effort key id for activity logging (invalid / missing auth)."""
+    raw = (raw or "").strip()
+    if not raw:
+        return "unknown"
+    try:
+        return _parse_key(raw)
+    except ValueError:
+        return "invalid"
+
+
 class ApiKeysManager:
     """Business logic for GtmDB API keys (backed by Postgres).
 
@@ -65,7 +76,8 @@ class ApiKeysManager:
         self._scope = scope
 
     def _require_admin(self) -> None:
-        scope = _request_scope.get() or self._scope
+        # Prefer explicit CLI ``bind_scope`` over per-request HTTP context.
+        scope = self._scope or _request_scope.get()
         if scope is None or scope.owner_type != "admin":
             raise PermissionError(
                 "Only admin keys can manage API keys. "
@@ -157,6 +169,7 @@ class ApiKeysManager:
             owner_type=row["owner_type"],
             label=row.get("label", ""),
             policies=row["policies"],
+            key_id=key_id,
             redact_mode="hint",
             is_active=True,
             expires_at=row["expires_at"],
@@ -222,3 +235,8 @@ class ApiKeysManager:
 def set_request_scope(scope: Scope | None) -> None:
     """Bind *scope* for the current asyncio task (HTTP request)."""
     _request_scope.set(scope)
+
+
+def get_request_scope() -> Scope | None:
+    """Current task's scope after successful ``get_scope`` (else ``None``)."""
+    return _request_scope.get()

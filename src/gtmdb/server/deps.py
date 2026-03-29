@@ -49,6 +49,7 @@ async def get_scope(
             owner_id="admin",
             owner_type="admin",
             preset_names=["full_access"],
+            key_id="admin",
         )
         scope = Scope(token)
     else:

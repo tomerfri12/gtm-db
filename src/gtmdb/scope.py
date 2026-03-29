@@ -34,6 +34,10 @@ class Scope:
         return self._token.owner_type
 
     @property
+    def key_id(self) -> str | None:
+        return self._token.key_id
+
+    @property
     def redact_mode(self) -> str:
         return self._token.redact_mode
 

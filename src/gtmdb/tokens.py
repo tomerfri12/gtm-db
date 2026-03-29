@@ -23,6 +23,7 @@ class AccessToken:
     label: str = ""
     policies: str = "[]"
     redact_mode: str = "hint"
+    key_id: str | None = None
     is_active: bool = True
     expires_at: datetime | None = None
     id: uuid.UUID = field(default_factory=uuid.uuid4)

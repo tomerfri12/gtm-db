@@ -11,6 +11,22 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from gtmdb.api_keys import ApiKeysManager, _generate_key, _hash_key, _parse_key
+from gtmdb.presets import create_token_from_presets
+from gtmdb.scope import Scope
+
+
+def _mgr_with_admin(store: AsyncMock) -> ApiKeysManager:
+    mgr = ApiKeysManager(store)
+    tok = create_token_from_presets(
+        "00000000-0000-4000-8000-000000000001",
+        "admin",
+        "admin",
+        ["full_access"],
+        key_id="admin",
+    )
+    mgr.bind_scope(Scope(tok))
+    return mgr
+
 
 
 class TestKeyGeneration:
@@ -167,7 +183,7 @@ class TestCreate:
     @pytest.mark.asyncio
     async def test_create_returns_raw_key(self):
         store = AsyncMock()
-        mgr = ApiKeysManager(store)
+        mgr = _mgr_with_admin(store)
         result = await mgr.create(
             owner_id="test-agent",
             tenant_id="00000000-0000-4000-8000-000000000001",
@@ -180,7 +196,7 @@ class TestCreate:
     @pytest.mark.asyncio
     async def test_create_with_expiry(self):
         store = AsyncMock()
-        mgr = ApiKeysManager(store)
+        mgr = _mgr_with_admin(store)
         result = await mgr.create(
             owner_id="test-agent",
             tenant_id="00000000-0000-4000-8000-000000000001",
@@ -191,7 +207,7 @@ class TestCreate:
     @pytest.mark.asyncio
     async def test_unknown_preset_raises(self):
         store = AsyncMock()
-        mgr = ApiKeysManager(store)
+        mgr = _mgr_with_admin(store)
         with pytest.raises(KeyError, match="nope"):
             await mgr.create(
                 owner_id="x",
@@ -205,7 +221,7 @@ class TestRevoke:
     async def test_revoke(self):
         store = AsyncMock()
         store.deactivate.return_value = True
-        mgr = ApiKeysManager(store)
+        mgr = _mgr_with_admin(store)
         assert await mgr.revoke("someid") is True
         store.deactivate.assert_called_once_with("someid")
 
@@ -226,7 +242,7 @@ class TestRotate:
             "expires_at": None,
             "created_by": "admin",
         }
-        mgr = ApiKeysManager(store)
+        mgr = _mgr_with_admin(store)
         result = await mgr.rotate("oldkey", expires_in_days=60)
         assert result.raw_key.startswith("gtmdb_")
         assert result.owner_id == "agent"

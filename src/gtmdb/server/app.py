@@ -11,8 +11,10 @@ from fastapi.responses import JSONResponse
 from gtmdb.client import GtmDB
 from gtmdb.config import GtmdbSettings
 from gtmdb.server.config import ServerSettings
+from gtmdb.server.middleware import ActivityLogMiddleware
 from gtmdb.server.routers import (
     accounts,
+    activity_log,
     admin,
     campaigns,
     contacts,
@@ -63,6 +65,7 @@ def create_app() -> FastAPI:
     v1.include_router(search.router)
     v1.include_router(schema.router)
     v1.include_router(explore.router)
+    v1.include_router(activity_log.router)
     v1.include_router(admin.router)
     v1.include_router(accounts.router)
     v1.include_router(leads.router)
@@ -72,6 +75,8 @@ def create_app() -> FastAPI:
     v1.include_router(emails.router)
     v1.include_router(email_campaigns.router)
     app.include_router(v1)
+
+    app.add_middleware(ActivityLogMiddleware)
 
     return app
 

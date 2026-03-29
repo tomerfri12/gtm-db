@@ -49,6 +49,7 @@ async def connect_gtmdb(
             owner_id="admin",
             owner_type="admin",
             preset_names=["full_access"],
+            key_id="admin",
         )
         scope = Scope(token)
         db.api_keys.bind_scope(scope)
