@@ -59,6 +59,14 @@ def key_id_from_raw_for_log(raw: str) -> str:
         return "invalid"
 
 
+def canonical_owner_type(raw: str) -> str:
+    """Normalize owner type to ``admin`` or ``actor`` (legacy ``agent`` → ``actor``)."""
+    t = str(raw or "").strip().lower()
+    if t == "admin":
+        return "admin"
+    return "actor"
+
+
 class ApiKeysManager:
     """Business logic for GtmDB API keys (backed by Postgres).
 
@@ -88,7 +96,7 @@ class ApiKeysManager:
         self,
         *,
         owner_id: str,
-        owner_type: str = "agent",
+        owner_type: str = "actor",
         tenant_id: str,
         preset_names: list[str] | None = None,
         extra_policies: list[dict[str, Any]] | None = None,
@@ -115,13 +123,14 @@ class ApiKeysManager:
             expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
 
         tid = uuid.UUID(tenant_id)
+        ot = canonical_owner_type(owner_type)
         row = {
             "id": uuid.uuid4(),
             "key_id": key_id,
             "key_hash": key_hash,
             "tenant_id": tid,
             "owner_id": owner_id,
-            "owner_type": owner_type,
+            "owner_type": ot,
             "label": label,
             "policies": json.dumps(policies),
             "is_active": True,
@@ -166,7 +175,7 @@ class ApiKeysManager:
         token = AccessToken(
             tenant_id=row["tenant_id"],
             owner_id=row["owner_id"],
-            owner_type=row["owner_type"],
+            owner_type=canonical_owner_type(row["owner_type"]),
             label=row.get("label", ""),
             policies=row["policies"],
             key_id=key_id,
@@ -221,7 +230,7 @@ class ApiKeysManager:
             ApiKeyInfo(
                 key_id=r["key_id"],
                 owner_id=r["owner_id"],
-                owner_type=r["owner_type"],
+                owner_type=canonical_owner_type(r["owner_type"]),
                 label=r.get("label", ""),
                 is_active=r["is_active"],
                 expires_at=r["expires_at"].isoformat() if r.get("expires_at") else None,

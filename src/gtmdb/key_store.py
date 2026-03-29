@@ -23,7 +23,7 @@ api_keys_table = sa.Table(
     sa.Column("key_hash", sa.String(64), nullable=False),
     sa.Column("tenant_id", sa.Uuid, nullable=False, index=True),
     sa.Column("owner_id", sa.String(255), nullable=False),
-    sa.Column("owner_type", sa.String(50), nullable=False, server_default="agent"),
+    sa.Column("owner_type", sa.String(50), nullable=False, server_default="actor"),
     sa.Column("label", sa.String(255), server_default=""),
     sa.Column("policies", sa.Text, nullable=False, server_default="[]"),
     sa.Column("is_active", sa.Boolean, nullable=False, server_default=sa.text("true")),

@@ -149,7 +149,7 @@ def main() -> None:
 
     kc = keys_sub.add_parser("create", help="Create a new API key.")
     kc.add_argument("--owner-id", required=True, help="Owner identity (e.g. agent id).")
-    kc.add_argument("--owner-type", default="agent", help="Owner type (default: agent).")
+    kc.add_argument("--owner-type", default="actor", help="Owner type (default: actor).")
     kc.add_argument("--presets", default="full_access", help="Comma-separated preset names.")
     kc.add_argument("--label", default="", help="Human-readable label.")
     kc.add_argument("--expires-days", type=int, default=None, help="Days until expiry.")

@@ -14,7 +14,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from gtmdb.api_keys import get_request_scope, key_id_from_raw_for_log, set_request_scope
+from gtmdb.api_keys import (
+    canonical_owner_type,
+    get_request_scope,
+    key_id_from_raw_for_log,
+    set_request_scope,
+)
 
 _MAX_BODY = 65536
 
@@ -37,14 +42,6 @@ _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
     re.I,
 )
-
-
-def _normalize_owner_type(ot: str | None) -> str | None:
-    if ot is None:
-        return None
-    if ot == "agent":
-        return "actor"
-    return ot
 
 
 def _infer_route_meta(method: str, path: str) -> tuple[str | None, str | None, str | None]:
@@ -199,7 +196,7 @@ class ActivityLogMiddleware(BaseHTTPMiddleware):
         if scope is not None:
             tid = scope.tenant_id
             oid = scope.owner_id
-            otype = _normalize_owner_type(scope.owner_type)
+            otype = canonical_owner_type(scope.owner_type)
             kid = scope.key_id or key_id_from_raw_for_log(raw or "")
         else:
             tid = None

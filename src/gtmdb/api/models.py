@@ -190,7 +190,7 @@ class ApiKeyInfo:
 
     key_id: str
     owner_id: str
-    owner_type: str = "agent"
+    owner_type: str = "actor"
     label: str = ""
     is_active: bool = True
     expires_at: str | None = None
