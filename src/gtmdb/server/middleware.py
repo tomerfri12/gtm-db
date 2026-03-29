@@ -53,8 +53,6 @@ def _infer_route_meta(method: str, path: str) -> tuple[str | None, str | None, s
         return "schema", "schema", None
     if seg0 == "admin":
         sub = rest[1] if len(rest) > 1 else None
-        if sub == "activity-log":
-            return "list_activity", "admin", None
         if sub == "keys":
             if len(rest) >= 4 and rest[3] == "rotate":
                 return "rotate_key", "admin", rest[2]
@@ -64,7 +62,7 @@ def _infer_route_meta(method: str, path: str) -> tuple[str | None, str | None, s
             return amap.get(method, "admin"), "admin", None
         return "admin", "admin", None
     if seg0 == "activity-log":
-        return "list_activity_self", "activity", None
+        return "list_activity", "activity", None
     if seg0 == "entities" and len(rest) >= 3:
         eid = rest[1]
         if rest[2] == "explore":
