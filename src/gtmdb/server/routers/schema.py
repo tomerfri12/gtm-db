@@ -10,11 +10,14 @@ from fastapi import APIRouter
 from gtmdb.api.models import (
     Account,
     Campaign,
+    Channel,
     Contact,
+    Content,
     Deal,
     Email,
     EmailCampaign,
     Lead,
+    Product,
     Score,
 )
 
@@ -40,6 +43,9 @@ _ENTITY_CLASSES: list[tuple[str, type]] = [
     ("Campaign", Campaign),
     ("EmailCampaign", EmailCampaign),
     ("Email", Email),
+    ("Channel", Channel),
+    ("Product", Product),
+    ("Content", Content),
 ]
 
 _RELATIONSHIPS: list[dict[str, Any]] = [
@@ -51,6 +57,10 @@ _RELATIONSHIPS: list[dict[str, Any]] = [
     {"type": "CONVERTED_TO", "from": ["Lead"], "to": ["Contact"]},
     {"type": "HAS_SCORE", "from": ["Lead"], "to": ["Score"]},
     {"type": "HAS_EMAIL", "from": ["EmailCampaign"], "to": ["Email"]},
+    {"type": "HAS_CAMPAIGN", "from": ["Channel"], "to": ["Campaign"]},
+    {"type": "HAS_CONTENT", "from": ["Campaign"], "to": ["Content"]},
+    {"type": "SIGNED_UP_FOR", "from": ["Lead"], "to": ["Product"]},
+    {"type": "FOR_PRODUCT", "from": ["Deal"], "to": ["Product"]},
     {"type": "CREATED_BY", "from": ["Actor"], "to": ["*"]},
     {"type": "UPDATED_BY", "from": ["Actor"], "to": ["*"]},
 ]

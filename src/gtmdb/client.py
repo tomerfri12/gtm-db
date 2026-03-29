@@ -16,10 +16,13 @@ if TYPE_CHECKING:
 from gtmdb.api.accounts import AccountsAPI
 from gtmdb.api.actors import ActorsAPI
 from gtmdb.api.campaigns import CampaignsAPI
+from gtmdb.api.channels import ChannelsAPI
 from gtmdb.api.communication_events import EmailCampaignAPI, EmailsAPI
 from gtmdb.api.contacts import ContactsAPI
+from gtmdb.api.content import ContentAPI
 from gtmdb.api.deals import DealsAPI
 from gtmdb.api.leads import LeadsAPI
+from gtmdb.api.products import ProductsAPI
 from gtmdb.api.scores import ScoresAPI
 from gtmdb.api.relationships import RelationshipsAPI
 from gtmdb.api._common import optional_reasoning, require_non_empty_str
@@ -42,6 +45,9 @@ class GtmDB:
         self._contacts: ContactsAPI | None = None
         self._deals: DealsAPI | None = None
         self._campaigns: CampaignsAPI | None = None
+        self._channels: ChannelsAPI | None = None
+        self._products: ProductsAPI | None = None
+        self._content: ContentAPI | None = None
         self._emails: EmailsAPI | None = None
         self._email_campaigns: EmailCampaignAPI | None = None
         self._relationships: RelationshipsAPI | None = None
@@ -129,6 +135,24 @@ class GtmDB:
         if self._campaigns is None:
             self._campaigns = CampaignsAPI(self._graph)
         return self._campaigns
+
+    @property
+    def channels(self) -> ChannelsAPI:
+        if self._channels is None:
+            self._channels = ChannelsAPI(self._graph)
+        return self._channels
+
+    @property
+    def products(self) -> ProductsAPI:
+        if self._products is None:
+            self._products = ProductsAPI(self._graph)
+        return self._products
+
+    @property
+    def content(self) -> ContentAPI:
+        if self._content is None:
+            self._content = ContentAPI(self._graph)
+        return self._content
 
     @property
     def emails(self) -> EmailsAPI:

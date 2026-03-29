@@ -94,6 +94,9 @@ Every entity type has the same five endpoints. Replace `{entity}` with the entit
 | **Campaigns** | `/v1/campaigns` | `name`, `status`, `channel`, `budget`, `start_date`, `end_date`, `description` |
 | **Email campaigns** | `/v1/email-campaigns` | `name`, `status`, `channel`, `budget`, `start_date`, `end_date`, `description`, `from_name`, `from_email`, `reply_to` |
 | **Emails** | `/v1/emails` | `name`, `subject`, `body`, `from_name`, `from_email`, `reply_to`, `state`, `sequence_number`, `send_at` |
+| **Channels** | `/v1/channels` | `name`, `channel_type`, `status`, `description`, `budget` |
+| **Products** | `/v1/products` | `name`, `sku`, `product_type`, `status`, `description`, `price` |
+| **Content** | `/v1/content` | `name`, `url`, `content_type`, `status`, `description` |
 
 **The five CRUD operations:**
 
@@ -439,6 +442,52 @@ await db.campaigns.add_lead(scope, camp.id, lead.id,
     reasoning="Matched ICP from intent data")
 ```
 
+### Channels
+
+```python
+channel = await db.channels.create(scope, actor_id="my-agent",
+    name="SEM", channel_type="paid", status="active",
+    description="Paid search campaigns")
+
+# Link channel to campaign (reasoning required)
+await db.relationships.create(scope, channel.id, "HAS_CAMPAIGN", camp.id,
+    reasoning="SEM channel sourced this search campaign")
+
+channels = await db.channels.list(scope, channel_type="paid")
+```
+
+**Channel types:** `"paid"`, `"organic"`, `"direct"`, `"partner"`, `"referral"` — free-form string, but be consistent.
+
+### Products
+
+```python
+product = await db.products.create(scope, actor_id="my-agent",
+    name="CRM", product_type="core", status="active",
+    description="Customer relationship management platform")
+
+# Link lead to product
+await db.relationships.create(scope, lead.id, "SIGNED_UP_FOR", product.id,
+    reasoning="Lead signed up for CRM product")
+
+# Link deal to product
+await db.relationships.create(scope, deal.id, "FOR_PRODUCT", product.id,
+    reasoning="Deal is for CRM product subscription")
+```
+
+### Content
+
+```python
+page = await db.content.create(scope, actor_id="my-agent",
+    name="CRM Landing Page", url="example.com/crm",
+    content_type="landing_page", status="published")
+
+# Link campaign to content
+await db.relationships.create(scope, camp.id, "HAS_CONTENT", page.id,
+    reasoning="Campaign drives traffic to this landing page")
+```
+
+**Content types:** `"landing_page"`, `"blog_post"`, `"whitepaper"`, `"case_study"`, `"webinar"`, `"video"` — free-form string.
+
 ### Email campaigns (with full email sequence)
 
 ```python
@@ -505,10 +554,13 @@ raw = await db.execute_cypher(scope, "MATCH (n:Lead) RETURN n LIMIT 5")
 ## Graph data model
 
 ```
+Channel —[HAS_CAMPAIGN]→ Campaign —[HAS_CONTENT]→ Content
 Account ←[WORKS_AT]— Contact
 Account ←[BELONGS_TO]— Deal
 Deal —[HAS_CONTACT]→ Contact
+Deal —[FOR_PRODUCT]→ Product
 Lead —[SOURCED_FROM]→ Campaign / EmailCampaign
+Lead —[SIGNED_UP_FOR]→ Product
 Lead —[CONVERTED_TO]→ Contact
 Lead ←[HAS_SCORE]— Score
 Campaign —[INFLUENCED]→ Deal
@@ -526,6 +578,10 @@ Actor —[UPDATED_BY]→ * (any entity)
 - **CONVERTED_TO**: Lead → Contact (lead became a customer contact)
 - **INFLUENCED**: Campaign → Deal (campaign influenced the deal)
 - **HAS_EMAIL**: EmailCampaign → Email (sequence steps)
+- **HAS_CAMPAIGN**: Channel → Campaign (channel groups campaigns)
+- **HAS_CONTENT**: Campaign → Content (campaign drives traffic to content)
+- **SIGNED_UP_FOR**: Lead → Product (lead signed up for a product)
+- **FOR_PRODUCT**: Deal → Product (deal is for a specific product)
 - **CREATED_BY / UPDATED_BY**: Actor → any (audit trail)
 
 ---

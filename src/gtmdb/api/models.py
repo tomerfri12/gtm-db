@@ -116,6 +116,43 @@ class EmailCampaign(Campaign):
     reply_to: str | None = None
 
 
+# -- Marketing entities (Channel, Product, Content) --------------------------
+
+
+@dataclass
+class Channel(Entity):
+    """Acquisition channel grouping campaigns (e.g. SEM, YouTube, Direct Sales)."""
+
+    name: str | None = None
+    channel_type: str | None = None
+    status: str | None = None
+    description: str | None = None
+    budget: float | None = None
+
+
+@dataclass
+class Product(Entity):
+    """Product or service being sold (e.g. CRM, Work Management)."""
+
+    name: str | None = None
+    sku: str | None = None
+    product_type: str | None = None
+    status: str | None = None
+    description: str | None = None
+    price: float | None = None
+
+
+@dataclass
+class Content(Entity):
+    """Marketing asset — landing page, blog post, whitepaper, case study, etc."""
+
+    name: str | None = None
+    url: str | None = None
+    content_type: str | None = None
+    status: str | None = None
+    description: str | None = None
+
+
 # -- Communication events (Email, Call, Meeting, …) --------------------------
 
 
