@@ -17,6 +17,22 @@ from starlette.responses import Response
 from gtmdb.api_keys import get_request_scope, key_id_from_raw_for_log, set_request_scope
 
 _MAX_BODY = 65536
+
+# Logged on ``request.state`` because BaseHTTPMiddleware breaks ContextVar visibility.
+_STATE_SCOPE_ATTR = "gtmdb_scope"
+
+
+def _should_skip_activity_log(path: str) -> bool:
+    """Do not persist audit rows for the audit endpoint itself."""
+    p = path.split("?", 1)[0].rstrip("/") or "/"
+    if p == "/v1/activity-log":
+        return True
+    if p.startswith("/v1/activity-log/"):
+        return True
+    # Legacy path (removed from API; still skip if something hits it)
+    if p == "/v1/admin/activity-log" or p.startswith("/v1/admin/activity-log/"):
+        return True
+    return False
 _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
     re.I,
@@ -147,6 +163,14 @@ class ActivityLogMiddleware(BaseHTTPMiddleware):
         method = request.method.upper()
         path = request.url.path
         ip = request.client.host if request.client else None
+        skip_log = _should_skip_activity_log(path)
+
+        if skip_log:
+            response = await call_next(request)
+            set_request_scope(None)
+            if hasattr(request.state, _STATE_SCOPE_ATTR):
+                delattr(request.state, _STATE_SCOPE_ATTR)
+            return response
 
         body = b""
         if method in ("POST", "PATCH", "PUT"):
@@ -170,7 +194,7 @@ class ActivityLogMiddleware(BaseHTTPMiddleware):
         )
         err = _error_detail(response)
 
-        scope = get_request_scope()
+        scope = getattr(wrapped.state, _STATE_SCOPE_ATTR, None) or get_request_scope()
         raw = _bearer_raw(wrapped)
         if scope is not None:
             tid = scope.tenant_id
@@ -220,4 +244,6 @@ class ActivityLogMiddleware(BaseHTTPMiddleware):
             asyncio.create_task(_persist())
 
         set_request_scope(None)
+        if hasattr(wrapped.state, _STATE_SCOPE_ATTR):
+            delattr(wrapped.state, _STATE_SCOPE_ATTR)
         return response

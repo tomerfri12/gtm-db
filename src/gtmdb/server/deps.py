@@ -67,6 +67,9 @@ async def get_scope(
             ) from e
 
     set_request_scope(scope)
+    # BaseHTTPMiddleware does not propagate ContextVar back to the outer task;
+    # activity logging reads ``request.state.gtmdb_scope`` after ``call_next``.
+    request.state.gtmdb_scope = scope
     return scope
 
 
