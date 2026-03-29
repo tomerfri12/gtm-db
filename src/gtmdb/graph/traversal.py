@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from neo4j import AsyncManagedTransaction
 
 
@@ -293,3 +295,83 @@ async def cypher_incident_edges(
         }
         for r in rows
     ]
+
+
+def _map_row(m: Any) -> dict[str, Any]:
+    """Normalize a Neo4j map / driver mapping to a plain dict."""
+    if m is None:
+        return {}
+    if isinstance(m, dict):
+        return dict(m)
+    return dict(m)
+
+
+async def cypher_explore_subgraph_bundle(
+    tx: AsyncManagedTransaction, center_id: str, tenant_id: str, max_depth: int
+) -> dict[str, Any]:
+    """Nodes within ``max_depth`` hops + edges BFS-equivalent in one transaction.
+
+    Nodes: shortest undirected distance from center in ``[0, max_depth]``.
+    Edges: directed ``(a)-[r]->(b)`` with both endpoints in that set and
+    ``dist(a) < max_depth OR dist(b) < max_depth`` (same as expanding frontiers
+    at distances ``0 .. max_depth-1`` in the Python BFS).
+    """
+    d = max(1, min(int(max_depth), 5))
+    q1 = (
+        f"MATCH (center {{id: $id, tenant_id: $tid}}) "
+        f"MATCH p = (center)-[*0..{d}]-(n) "
+        "WHERE ALL(x IN nodes(p) WHERE x.tenant_id = $tid) "
+        "WITH n, min(length(p)) AS dist "
+        "RETURN collect(DISTINCT {id: n.id, labels: labels(n), "
+        "props: properties(n), dist: dist}) AS node_rows"
+    )
+    result = await tx.run(q1, id=center_id, tid=tenant_id)
+    rec = await result.single()
+    if not rec:
+        return {"node_rows": [], "edges": []}
+
+    raw_nodes = rec["node_rows"]
+    if not raw_nodes:
+        return {"node_rows": [], "edges": []}
+
+    node_rows: list[dict[str, Any]] = []
+    for m in raw_nodes:
+        row = _map_row(m)
+        labels = row.get("labels")
+        if labels is not None and not isinstance(labels, list):
+            labels = list(labels)
+        props = row.get("props")
+        node_rows.append(
+            {
+                "id": str(row["id"]),
+                "labels": list(labels or []),
+                "props": dict(props or {}),
+                "dist": int(row["dist"]),
+            }
+        )
+
+    q2 = (
+        "UNWIND $node_rows AS nr1 "
+        "UNWIND $node_rows AS nr2 "
+        "WITH nr1, nr2 WHERE nr1.id <> nr2.id "
+        "MATCH (a {id: nr1.id, tenant_id: $tid})-[r]->(b {id: nr2.id, tenant_id: $tid}) "
+        "WHERE nr1.dist < $maxd OR nr2.dist < $maxd "
+        "RETURN collect(DISTINCT {from_id: a.id, to_id: b.id, rel_type: type(r), "
+        "rel_props: properties(r)}) AS edges"
+    )
+    result2 = await tx.run(q2, node_rows=node_rows, tid=tenant_id, maxd=d)
+    rec2 = await result2.single()
+    edges_out: list[dict[str, Any]] = []
+    if rec2 and rec2.get("edges"):
+        for e in rec2["edges"]:
+            er = _map_row(e)
+            edges_out.append(
+                {
+                    "from_id": str(er["from_id"]),
+                    "to_id": str(er["to_id"]),
+                    "rel_type": str(er["rel_type"]),
+                    "rel_props": dict(er.get("rel_props") or {}),
+                }
+            )
+
+    return {"node_rows": node_rows, "edges": edges_out}

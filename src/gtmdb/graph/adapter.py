@@ -451,59 +451,36 @@ class GraphAdapter:
         cap = max(1, min(int(nodes_per_type_cap), 50))
 
         async with self._driver.session() as session:
-            center_row = await session.execute_read(
-                tr.cypher_find_node_by_id, center_id, scope.tenant_id
+            bundle = await session.execute_read(
+                tr.cypher_explore_subgraph_bundle,
+                center_id,
+                scope.tenant_id,
+                d,
             )
-        if center_row is None:
+        node_rows: list[dict[str, Any]] = bundle["node_rows"]
+        if not node_rows:
             return {"nodes": {}, "edges": [], "truncated": {}}
 
-        clabels = center_row["labels"]
-        c_label = clabels[0] if clabels else "Unknown"
-        label_by_id: dict[str, str] = {center_id: c_label}
+        label_by_id: dict[str, str] = {
+            nr["id"]: (nr["labels"][0] if nr["labels"] else "Unknown")
+            for nr in node_rows
+        }
+        all_ids: set[str] = {nr["id"] for nr in node_rows}
 
-        frontier: set[str] = {center_id}
-        all_ids: set[str] = {center_id}
         edges_raw: list[dict[str, Any]] = []
-        seen_edge: set[tuple[str, str, str]] = set()
+        for row in bundle["edges"]:
+            rp = dict(row["rel_props"])
+            edge_obj: dict[str, Any] = {
+                "from": row["from_id"],
+                "to": row["to_id"],
+                "type": row["rel_type"],
+            }
+            edge_obj.update(rp)
+            edges_raw.append(edge_obj)
 
-        for _ in range(d):
-            next_frontier: set[str] = set()
-            for nid in frontier:
-                async with self._driver.session() as session:
-                    rows = await session.execute_read(
-                        tr.cypher_incident_edges, nid, scope.tenant_id
-                    )
-                for row in rows:
-                    fid, tid2 = row["from_id"], row["to_id"]
-                    rt = row["rel_type"]
-                    ek = (fid, tid2, rt)
-                    if ek not in seen_edge:
-                        seen_edge.add(ek)
-                        rp = dict(row["rel_props"])
-                        edge_obj: dict[str, Any] = {
-                            "from": fid,
-                            "to": tid2,
-                            "type": rt,
-                        }
-                        edge_obj.update(rp)
-                        edges_raw.append(edge_obj)
-                    other = tid2 if fid == nid else fid
-                    if other not in all_ids:
-                        all_ids.add(other)
-                        next_frontier.add(other)
-                        async with self._driver.session() as session:
-                            nr = await session.execute_read(
-                                tr.cypher_find_node_by_id,
-                                other,
-                                scope.tenant_id,
-                            )
-                        if nr and nr["labels"]:
-                            label_by_id[other] = nr["labels"][0]
-                        else:
-                            label_by_id[other] = "Unknown"
-            frontier = next_frontier
-            if not frontier:
-                break
+        props_by_id: dict[str, dict[str, Any]] = {
+            nr["id"]: dict(nr["props"]) for nr in node_rows
+        }
 
         # Totals per label
         total_by_label: dict[str, int] = {}
@@ -529,14 +506,10 @@ class GraphAdapter:
         if mode == "full":
             nodes_out: dict[str, Any] = {}
             for nid in sorted(included_ids):
-                async with self._driver.session() as session:
-                    row = await session.execute_read(
-                        tr.cypher_find_node_by_id, nid, scope.tenant_id
-                    )
-                if not row:
+                raw_props = props_by_id.get(nid)
+                if raw_props is None:
                     continue
-                pl = row["labels"][0] if row["labels"] else "Unknown"
-                raw_props = dict(row["properties"])
+                pl = label_by_id.get(nid, "Unknown")
                 item = self._finalize_read_node(scope, pl, raw_props)
                 if item is None:
                     continue
