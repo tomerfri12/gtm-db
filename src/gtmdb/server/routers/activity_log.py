@@ -4,6 +4,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from gtmdb.api_keys import canonical_owner_type
 from gtmdb.client import GtmDB
 from gtmdb.scope import Scope
 from gtmdb.server.deps import get_db, get_scope
@@ -71,5 +72,11 @@ async def activity_log(
         ts = d.get("timestamp")
         if ts is not None and hasattr(ts, "isoformat"):
             d["timestamp"] = ts.isoformat()
+        ot = d.get("owner_type")
+        if ot is not None:
+            d["owner_type"] = canonical_owner_type(str(ot))
+        # Legacy rows: explore used entity_type "entity"
+        if d.get("action") == "explore" and d.get("entity_type") == "entity":
+            d["entity_type"] = "explore"
         out.append(d)
     return out

@@ -78,9 +78,11 @@ def _infer_route_meta(method: str, path: str) -> tuple[str | None, str | None, s
         return "list_activity", "activity", None
     if seg0 == "entities" and len(rest) >= 3:
         eid = rest[1]
+        eid_ok = eid if _UUID_RE.match(eid) else None
         if rest[2] == "explore":
-            return "explore", "entity", eid if _UUID_RE.match(eid) else None
-        return None, "entity", eid if _UUID_RE.match(eid) else None
+            return "explore", "explore", eid_ok
+        # e.g. /v1/entities/{id}/<subresource> — name the subresource, not "entity"
+        return None, rest[2], eid_ok
 
     resource = seg0
     if len(rest) == 1:

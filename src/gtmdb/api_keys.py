@@ -60,7 +60,12 @@ def key_id_from_raw_for_log(raw: str) -> str:
 
 
 def canonical_owner_type(raw: str) -> str:
-    """Normalize owner type to ``admin`` or ``actor`` (legacy ``agent`` → ``actor``)."""
+    """Normalize owner type to ``admin`` or ``actor``.
+
+    API keys and audit logs only distinguish privileged (``admin``) vs everyone
+    else. Legacy values such as ``agent``, ``human``, ``user``, ``ai`` map to
+    ``actor`` so clients never see ambiguous labels in the activity log.
+    """
     t = str(raw or "").strip().lower()
     if t == "admin":
         return "admin"
