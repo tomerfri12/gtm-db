@@ -103,7 +103,7 @@ Use whichever style the human’s environment supports; the **contract** (paths,
 
 **How keys relate to what you can do**
 
-- Keys are tied to a **tenant** and a **permission profile**. The human (or their admin) decides what you may **read**, **write**, and which **fields** you see.
+- Keys are tied to a **tenant** and a **permission profile**. That profile defines what you may **read**, **write**, and which **fields** you see—the human who gave you the key is responsible for it matching your task.
 - **You only have the permissions on *your* key.** If something fails with **403**, you may be blocked for that operation or field—not necessarily because the data doesn’t exist.
 
 **If you truly have no key**
@@ -384,7 +384,7 @@ Use these as **playbooks**. Replace `{BASE}` and ids with real values.
 |------|------------------------|-------------------|
 | **400** | Bad body (missing **`actor_id`** where required, empty **`reasoning`** on links, invalid field) | Fix the payload; quote `detail` from the response to the human if useful. |
 | **401** | Missing/invalid API key | Ask the human to verify the key. |
-| **403** | **Not allowed** for this key (read/write/field masked) | Explain **you aren’t permitted**, not “data doesn’t exist.” Suggest they adjust the key policy with their admin. |
+| **403** | **Not allowed** for this key (read/write/field masked) | Explain **you aren’t permitted**, not “data doesn’t exist.” Suggest the human **request a key or permission change** from whoever manages GtmDB access in their organization. |
 | **404** | Unknown id or route | Id may be wrong, deleted, or outside tenant. Confirm id and tenant. |
 
 **Network / 5xx** — retry with backoff once or twice; if it persists, stop and tell the human the service is unhealthy.
