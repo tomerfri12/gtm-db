@@ -1,776 +1,462 @@
 ---
 name: gtmdb
-description: GtmDB — the world's best graph-native GTM data layer. Neo4j-backed accounts, leads, contacts, deals, campaigns, email programs, scores, relationships. Async Python SDK + REST API. Every write needs actor_id. Tiered edge reasoning. Scores only via leads.add_score.
+description: GtmDB — GTM system of record as a graph (accounts, leads, contacts, deals, campaigns, links). REST or code (curl, httpx, Python SDK) with scoped API keys; prefer compact explore + targeted GET over mode=full. Reasoning on writes.
 metadata: {"openclaw": {"requires": {"bins": ["python3"]}, "homepage": "https://github.com/tomerfri12/gtm-db"}}
 ---
 
-# GtmDB
+# GtmDB — agent skill
 
-GtmDB is the **graph-native CRM/GTM persistence engine**. It stores accounts, leads, contacts, deals, campaigns, email programs, scores, and the relationships between them in **Neo4j** — with full tenant isolation, field-level permissions, and audit trails.
-
-Use this skill when the user needs to **read, write, search, or analyze CRM/GTM data** through the GtmDB Python SDK or REST API.
+Use this skill when the user wants **go-to-market (GTM) truth**: people, companies, pipeline, programs, touches, and **how they connect**—not a one-off export. You interact through an **HTTP API** (REST) with a **Bearer token**, or through **code** that performs the same requests. You do **not** need implementation details of how the server stores data internally.
 
 ---
 
-## Getting your API key
+## 1. What this system is (and why it helps you)
 
-**You need an API key before you can do anything.** GtmDB authenticates every request.
+### GTM and **one source of truth**
 
-1. **Ask the human** for a GtmDB API key, or
-2. **Read it from an environment variable** (commonly `GTMDB_API_KEY` or `GTMDB_ADMIN_KEY`).
+**GTM (go-to-market)** is everything your org does to **find, win, and grow customers**: marketing programs, inbound and outbound motion, sales pipeline, and (in mature setups) customer-success context on the same accounts. In most companies that reality is **fragmented**—spreadsheets, partial CRM exports, and tool-specific APIs that don’t agree.
 
-```python
-import os
-api_key = os.environ.get("GTMDB_API_KEY") or os.environ.get("GTMDB_ADMIN_KEY")
-if not api_key:
-    raise RuntimeError("No GtmDB API key found. Ask the user or set GTMDB_API_KEY.")
-```
+**GtmDB is meant to be the system of record for that world:** **one authoritative store** where marketing, sales, and ops-aligned workflows read and write the **same** accounts, leads, contacts, deals, campaigns, and the **relationships** between them (attribution, ownership, influence, enrollment—not just unrelated tables). When a human or an agent asks “what happened with this account?” or “where did this lead come from?”, the answer should come from **this layer**, not from three conflicting copies.
 
-There are two key types:
+That matches the product intent in the official docs: **one system of record for GTM—and the agents that use it**—with typed reads/writes and traversals over the **commercial graph** (the full entity model in **`GET /v1/schema`**) so **MCP servers, tools, and automations** can share **one** integration surface instead of re-wrapping a different partial API per system.
 
-| Type | Source | Permissions | Can manage keys? |
-|------|--------|-------------|-----------------|
-| **Admin** | `GTMDB_ADMIN_KEY` env var | Full access to everything | Yes |
-| **Agent** | Provisioned via admin (`gtmdb_<key_id>_<secret>`) | Policy-scoped per key | No |
+**Security is part of the same story:** every call runs under a **scoped** permission model (tenant isolation, what you may read/write, sometimes field masking). Different keys can represent a human rep, an internal agent, or a partner—so **what you see is what was deliberately allowed**, which is how autonomous GTM stays governable.
 
-Use whichever you have. Both work the same way for data operations.
+### The graph shape (how you should think)
 
----
+**GtmDB** exposes that system of record as a **graph**:
 
-## Two ways to talk to GtmDB
+- **Nodes** are entities: accounts, leads, contacts, deals, campaigns, email programs, content, products, etc.
+- **Relationships** carry meaning the business cares about: e.g. a lead **sourced from** a campaign, a contact **works at** an account, a deal **belongs to** an account, stakeholders **on** a deal.
 
-### Option A: REST API (recommended for most agents)
+### Why that helps **you** (the agent)
 
-The hosted REST API is at:
+- **Multi-hop questions** (e.g. contact → deals → account → campaigns) have a natural home instead of the human stitching spreadsheets.
+- **Scoped keys** reduce blast radius: you operate inside explicit read/write rules.
+- **Reasoning on writes** (see §10) makes autonomous changes **auditable**—aligned with how a real system of record is governed.
 
-```
-https://gtm-db-production.up.railway.app
-```
+### Run GtmDB **as code** (same API, executable)
 
-Every `/v1/*` request requires:
+You are not limited to describing curl in chat. **Execute** the same operations from a terminal or script the human approves:
 
-```
-Authorization: Bearer <api_key>
-```
-
-### Option B: Python SDK (for scripts or deeper integrations)
+**Shell (`curl`)**
 
 ```bash
-pip install "git+https://github.com/tomerfri12/gtm-db.git"
+export GTMDB_BASE="https://your-instance.example"   # human provides
+export GTMDB_API_KEY="…"                            # human provides
+
+curl -sS -H "Authorization: Bearer $GTMDB_API_KEY" \
+  "$GTMDB_BASE/v1/schema" | head -c 2000
 ```
+
+```bash
+curl -sS -H "Authorization: Bearer $GTMDB_API_KEY" \
+  "$GTMDB_BASE/v1/search?q=acme&limit=5"
+```
+
+**Python (`httpx` or `requests`)** — same headers and URLs as §3:
 
 ```python
-from gtmdb import connect_gtmdb
+import os, httpx
 
-db, scope = await connect_gtmdb(api_key=api_key)
-# ... use db.leads, db.accounts, etc.
-await db.close()
+base = os.environ["GTMDB_BASE"].rstrip("/")
+key = os.environ["GTMDB_API_KEY"]
+
+def gtm(method: str, path: str, **kw):
+    r = httpx.request(
+        method,
+        f"{base}{path}",
+        headers={"Authorization": f"Bearer {key}"},
+        timeout=60.0,
+        **kw,
+    )
+    r.raise_for_status()
+    return r.json() if r.content else None
+
+rows = gtm("GET", "/v1/search", params={"q": "acme", "limit": 10})
 ```
 
----
-
-## REST API reference
-
-Base URL: `https://gtm-db-production.up.railway.app`
-
-### Public endpoints (no auth needed)
-
-| Method | Path | Response |
-|--------|------|----------|
-| GET | `/health` | `{"status": "ok"}` |
-| GET | `/docs` | OpenAPI interactive UI |
-| GET | `/v1/schema` | Full schema: node types with fields, relationship catalog |
-
-### CRUD endpoints (all entities)
-
-Every entity type has the same five endpoints. Replace `{entity}` with the entity name from the table below.
-
-| Entity | Path prefix | Domain fields |
-|--------|-------------|---------------|
-| **Accounts** | `/v1/accounts` | `name`, `domain`, `industry`, `employee_count`, `annual_revenue`, `website`, `type` |
-| **Leads** | `/v1/leads` | `first_name`, `last_name`, `email`, `phone`, `title`, `company_name`, `domain`, `status`, `source`, `score`, `linkedin_url`, `snippet`, `outreach_email` |
-| **Contacts** | `/v1/contacts` | `first_name`, `last_name`, `email`, `phone`, `title`, `company_name`, `department`, `linkedin_url` |
-| **Deals** | `/v1/deals` | `name`, `amount`, `stage`, `probability`, `close_date`, `description`, `owner_id` |
-| **Campaigns** | `/v1/campaigns` | `name`, `status`, `channel`, `budget`, `start_date`, `end_date`, `description` |
-| **Email campaigns** | `/v1/email-campaigns` | `name`, `status`, `channel`, `budget`, `start_date`, `end_date`, `description`, `from_name`, `from_email`, `reply_to` |
-| **Emails** | `/v1/emails` | `name`, `subject`, `body`, `from_name`, `from_email`, `reply_to`, `state`, `sequence_number`, `send_at` |
-| **Channels** | `/v1/channels` | `name`, `channel_type`, `status`, `description`, `budget` |
-| **Products** | `/v1/products` | `name`, `sku`, `product_type`, `status`, `description`, `price` |
-| **Content** | `/v1/content` | `name`, `url`, `content_type`, `status`, `description` |
-
-**The five CRUD operations:**
-
-#### Create
-
-```
-POST /v1/{entity}
-Content-Type: application/json
-Authorization: Bearer <key>
-
-{
-  "actor_id": "my-agent",
-  "name": "Acme Corp",
-  "domain": "acme.com",
-  "reasoning": "Optional audit note on why this was created"
-}
-```
-
-Response: the created entity (only non-null fields).
-
-#### Get one
-
-```
-GET /v1/{entity}/{id}
-Authorization: Bearer <key>
-```
-
-#### List (with filtering)
-
-```
-GET /v1/{entity}?limit=50&offset=0&status=active&channel=email
-Authorization: Bearer <key>
-```
-
-- `limit`: 1–500 (default 50)
-- `offset`: 0+ (default 0)
-- Any **domain field** as a query param filters by equality
-
-Response: array of entity dicts.
-
-#### Update
-
-```
-PATCH /v1/{entity}/{id}
-Authorization: Bearer <key>
-
-{
-  "actor_id": "my-agent",
-  "stage": "negotiation",
-  "reasoning": "Customer agreed to terms"
-}
-```
-
-#### Delete
-
-```
-DELETE /v1/{entity}/{id}
-Authorization: Bearer <key>
-```
-
-Response: `{"deleted": true}`
-
-### Relationship and link endpoints
-
-These create typed graph edges between entities. **`reasoning` is always required** — explain *why* this link exists.
-
-#### Link lead to campaign
-
-```
-POST /v1/leads/{lead_id}/link-campaign
-Authorization: Bearer <key>
-
-{"campaign_id": "...", "reasoning": "Registered via webinar landing page"}
-```
-
-#### Add lead to campaign (from campaign side)
-
-```
-POST /v1/campaigns/{campaign_id}/add-lead
-Authorization: Bearer <key>
-
-{"lead_id": "...", "reasoning": "Matched ICP from intent data"}
-```
-
-#### Assign contact to account
-
-```
-POST /v1/contacts/{contact_id}/assign-account
-Authorization: Bearer <key>
-
-{"account_id": "...", "reasoning": "Primary stakeholder identified in QBR"}
-```
-
-#### Assign deal to account
-
-```
-POST /v1/deals/{deal_id}/assign-account
-Authorization: Bearer <key>
-
-{"account_id": "...", "reasoning": "Parent account for this opportunity"}
-```
-
-#### Add contact to deal
-
-```
-POST /v1/deals/{deal_id}/add-contact
-Authorization: Bearer <key>
-
-{"contact_id": "...", "reasoning": "Economic buyer confirmed in discovery"}
-```
-
-### Scoring leads
-
-Scores are **only** created through leads. Never try to POST to a `/scores` endpoint.
-
-```
-POST /v1/leads/{lead_id}/scores
-Authorization: Bearer <key>
-
-{
-  "actor_id": "scoring-agent",
-  "has_score_reasoning": "BANT fit based on discovery call notes",
-  "total": 72,
-  "score_type": "bant",
-  "budget": 8,
-  "authority": 9,
-  "need": 7,
-  "timeline": 6,
-  "reasoning": "Strong budget signal from Q1 planning mention",
-  "status": "qualified",
-  "scored_by": "scoring-agent"
-}
-```
-
-- **`has_score_reasoning`** is **required** (non-empty) — this goes on the HAS_SCORE edge
-- **`score_type`** defaults to `"bant"`, **`total`** defaults to 0
-- Optional BANT sub-scores: `budget`, `authority`, `need`, `timeline`
-- `reasoning` is for the Score node itself (qualification narrative)
-
-### Email campaigns with artifacts (composite create)
-
-Create an email campaign with all its email steps and lead attributions in one call:
-
-```
-POST /v1/email-campaigns/with-artifacts
-Authorization: Bearer <key>
-
-{
-  "actor_id": "nurture-agent",
-  "name": "Q1 Nurture Sequence",
-  "status": "draft",
-  "from_name": "Jane at Acme",
-  "from_email": "jane@acme.com",
-  "emails": [
-    {"subject": "Hi {{name}}, quick question", "body": "...", "sequence_number": 1},
-    {"subject": "Following up", "body": "...", "sequence_number": 2},
-    {"subject": "Last chance", "body": "...", "sequence_number": 3}
-  ],
-  "lead_ids": ["lead-uuid-1", "lead-uuid-2"],
-  "sourced_from_reasoning": "Enrolled from inbound demo requests"
-}
-```
-
-Response: `{"campaign": {...}, "email_ids": [...], "linked_lead_count": 2}`
-
-- If `lead_ids` is non-empty, `sourced_from_reasoning` is **required**
-- `has_email_reasoning` is optional (stored on EmailCampaign→Email edges)
-
-### Search
-
-```
-GET /v1/search?q=acme&limit=25
-Authorization: Bearer <key>
-```
-
-Response: `[{"type": "Account", "id": "...", "name": "Acme Corp"}, ...]`
-
-- `q` is required (min 1 char)
-- `limit`: 1–100 (default 25)
-- Searches across all entity types by name/properties
-
-### Explore (subgraph traversal)
-
-```
-GET /v1/entities/{entity_id}/explore?depth=2
-Authorization: Bearer <key>
-```
-
-Returns a subgraph of connected nodes and edges around the given entity.
-
-**`mode` parameter** (default: `compact`):
-
-- **`?mode=compact`** (default) — node IDs grouped by type, lightweight edges. Fast and cheap:
-
-```json
-{
-  "nodes": {"Account": ["id-1"], "Lead": ["id-2", "id-3"], "Campaign": ["id-4"]},
-  "edges": [
-    {"from": "id-2", "to": "id-4", "type": "SOURCED_FROM"},
-    {"from": "id-2", "to": "id-1", "type": "WORKS_AT"}
-  ],
-  "truncated": {}
-}
-```
-
-- **`?mode=full`** — full node properties on every node (heavier, use when you need field values):
-
-```json
-{
-  "nodes": {
-    "id-1": {"type": "Account", "id": "id-1", "name": "Acme Corp", "domain": "acme.com"},
-    "id-2": {"type": "Lead", "id": "id-2", "name": "Jane Doe", "email": "jane@acme.com"}
-  },
-  "edges": [{"from": "id-2", "to": "id-1", "type": "WORKS_AT", "reasoning": "..."}],
-  "truncated": {}
-}
-```
-
-**Best practice:** Start with compact to understand the graph shape, then fetch specific nodes with `GET /v1/{entity}/{id}` or re-explore with `mode=full` if you need all properties at once.
-
-### Admin: API key management
-
-These require an **admin** API key.
-
-```
-POST   /v1/admin/keys              — Create an agent key
-GET    /v1/admin/keys              — List active keys
-DELETE /v1/admin/keys/{key_id}     — Revoke a key
-POST   /v1/admin/keys/{key_id}/rotate — Rotate (revoke old, create new)
-```
-
-Create key body:
-
-```json
-{
-  "owner_id": "sdr-agent",
-  "owner_type": "agent",
-  "preset_names": ["write_all"],
-  "label": "SDR Bot production key",
-  "expires_in_days": 90
-}
-```
-
-Presets: `full_access`, `read_all`, `write_all`, `no_raw_content`. Combine as needed.
-
----
-
-## Python SDK reference
-
-### Connect
+**Python SDK (async, in-process)** — mirrors the REST rules (`actor_id`, link `reasoning`, scores only via leads):
 
 ```python
-from gtmdb import connect_gtmdb
 import os
+from gtmdb import connect_gtmdb
 
 api_key = os.environ["GTMDB_API_KEY"]
 db, scope = await connect_gtmdb(api_key=api_key)
-```
-
-Always close when done:
-
-```python
+lead = await db.leads.get(scope, "…uuid…")
 await db.close()
 ```
 
-### Accounts
+Use whichever style the human’s environment supports; the **contract** (paths, body fields, permissions) is the same.
 
-```python
-acc = await db.accounts.create(scope, actor_id="my-agent",
-    name="Acme Corp", domain="acme.com", industry="SaaS",
-    employee_count=500, annual_revenue=50000000)
+---
 
-acc = await db.accounts.get(scope, acc.id)
-rows = await db.accounts.list(scope, limit=50, industry="SaaS")
-acc = await db.accounts.update(scope, acc.id, actor_id="my-agent", type="enterprise")
-await db.accounts.delete(scope, acc.id)
-```
+## 2. API key: ask the human, keep it, respect limits
 
-### Leads
+**Before any call**, you need:
 
-```python
-lead = await db.leads.create(scope, actor_id="my-agent",
-    first_name="Jane", last_name="Doe", email="jane@acme.com",
-    company_name="Acme", title="VP Engineering", source="webinar")
+1. **Base URL** of the GtmDB instance (e.g. the human’s deployed server or their dev URL).
+2. **API key** string the human gives you.
 
-await db.leads.update(scope, lead.id, actor_id="my-agent", status="qualified")
+**Ask the human** for both if missing. Suggest they store the key where you can reuse it next time (e.g. env var `GTMDB_API_KEY`, a password manager note they paste in, or their agent secrets—whatever *they* use).
 
-# Link to campaign (reasoning required)
-await db.leads.link_campaign(scope, lead.id, campaign.id,
-    reasoning="Registered via webinar landing page")
+**How keys relate to what you can do**
 
-# Score the lead (always use add_score, never db.scores.create)
-await db.leads.add_score(scope, lead.id,
-    actor_id="scoring-agent",
-    has_score_reasoning="BANT fit from discovery call",
-    total=72, score_type="bant",
-    budget=8, authority=9, need=7, timeline=6)
+- Keys are tied to a **tenant** and a **permission profile**. The human (or their admin) decides what you may **read**, **write**, and which **fields** you see.
+- **You only have the permissions on *your* key.** If something fails with **403**, you may be blocked for that operation or field—not necessarily because the data doesn’t exist.
 
-scores = await db.leads.scores_for(scope, lead.id)
-```
+**If you truly have no key**
 
-**Lead statuses:** `"new"` (default), `"contacted"`, `"qualified"`, `"unqualified"`, etc. — free-form string, but be consistent.
+- You cannot call authenticated routes. Say clearly that the human must provide a GtmDB API key (and base URL) before you can query or update data.
 
-### Contacts
+**Optional check** (no auth):
 
-```python
-contact = await db.contacts.create(scope, actor_id="my-agent",
-    first_name="Sam", last_name="Lee", email="sam@acme.com",
-    title="CTO", department="Engineering")
-
-# Assign to account (reasoning required)
-await db.contacts.assign_to_account(scope, contact.id, acc.id,
-    reasoning="Primary technical stakeholder")
-
-# List contacts for an account
-contacts = await db.contacts.for_account(scope, acc.id, limit=50)
-```
-
-### Deals
-
-```python
-deal = await db.deals.create(scope, actor_id="my-agent",
-    name="Acme expansion", amount=150000, stage="proposal",
-    probability=0.7, close_date="2026-06-30")
-
-await db.deals.assign_to_account(scope, deal.id, acc.id,
-    reasoning="Parent account for this opportunity")
-
-await db.deals.add_contact(scope, deal.id, contact.id,
-    reasoning="Economic buyer from procurement")
-
-deals = await db.deals.for_account(scope, acc.id)
-```
-
-### Campaigns
-
-```python
-camp = await db.campaigns.create(scope, actor_id="my-agent",
-    name="Q1 Outbound", channel="email", status="active",
-    budget=10000, start_date="2026-01-01", end_date="2026-03-31")
-
-await db.campaigns.add_lead(scope, camp.id, lead.id,
-    reasoning="Matched ICP from intent data")
-```
-
-### Channels
-
-```python
-channel = await db.channels.create(scope, actor_id="my-agent",
-    name="SEM", channel_type="paid", status="active",
-    description="Paid search campaigns")
-
-# Link channel to campaign (reasoning required)
-await db.relationships.create(scope, channel.id, "HAS_CAMPAIGN", camp.id,
-    reasoning="SEM channel sourced this search campaign")
-
-channels = await db.channels.list(scope, channel_type="paid")
-```
-
-**Channel types:** `"paid"`, `"organic"`, `"direct"`, `"partner"`, `"referral"` — free-form string, but be consistent.
-
-### Products
-
-```python
-product = await db.products.create(scope, actor_id="my-agent",
-    name="CRM", product_type="core", status="active",
-    description="Customer relationship management platform")
-
-# Link lead to product
-await db.relationships.create(scope, lead.id, "SIGNED_UP_FOR", product.id,
-    reasoning="Lead signed up for CRM product")
-
-# Link deal to product
-await db.relationships.create(scope, deal.id, "FOR_PRODUCT", product.id,
-    reasoning="Deal is for CRM product subscription")
-```
-
-### Content
-
-```python
-page = await db.content.create(scope, actor_id="my-agent",
-    name="CRM Landing Page", url="example.com/crm",
-    content_type="landing_page", status="published")
-
-# Link campaign to content
-await db.relationships.create(scope, camp.id, "HAS_CONTENT", page.id,
-    reasoning="Campaign drives traffic to this landing page")
-```
-
-**Content types:** `"landing_page"`, `"blog_post"`, `"whitepaper"`, `"case_study"`, `"webinar"`, `"video"` — free-form string.
-
-### Email campaigns (with full email sequence)
-
-```python
-result = await db.email_campaigns.create_with_artifacts(scope,
-    actor_id="my-agent",
-    name="Nurture A",
-    status="draft",
-    from_name="Jane",
-    from_email="jane@acme.com",
-    emails=[
-        {"subject": "Hi {{name}}", "body": "Intro email...", "sequence_number": 1},
-        {"subject": "Quick follow-up", "body": "Follow-up...", "sequence_number": 2},
-    ],
-    lead_ids=[lead.id],
-    sourced_from_reasoning="Enrolled from inbound demo request")
-
-campaign = result["campaign"]
-email_ids = result["email_ids"]
-```
-
-### Relationships (generic edges)
-
-For edges **not covered by typed helpers** above (e.g. Lead→Account WORKS_AT, Campaign→Deal INFLUENCED):
-
-```python
-await db.relationships.create(scope, lead.id, "WORKS_AT", acc.id,
-    reasoning="Domain match and title confirms employment")
-
-rels = await db.relationships.list(scope, acc.id,
-    rel_type="WORKS_AT", direction="in", limit=100)
-
-await db.relationships.delete(scope, from_id=lead.id,
-    rel_type="WORKS_AT", to_id=acc.id)
-```
-
-**Always prefer typed helpers** (`contacts.assign_to_account`, `leads.link_campaign`, etc.) when they exist. Use `relationships.create` only for edge types without a dedicated method.
-
-### Actors
-
-Actors represent humans or AI agents in the audit trail. They're auto-created when you pass `actor_id` to create/update, but you can also manage them explicitly:
-
-```python
-await db.actors.ensure(scope, "my-agent", kind="ai", display_name="SDR Bot")
-
-from gtmdb.api.models import ActorSpec
-await db.actors.create(scope, [
-    ActorSpec(id="human-42", kind="human", display_name="Pat Chen"),
-])
-```
-
-### Advanced: traversals and graph queries
-
-```python
-subgraph = await db.entity_360(scope, entity_id, depth=2)
-neighbors = await db.get_neighbors(scope, entity_id)
-results = await db.search(scope, query="acme", limit=25)
-pipeline = await db.pipeline(scope, stage="proposal")
-attribution = await db.campaign_attribution(scope, campaign_id)
-raw = await db.execute_cypher(scope, "MATCH (n:Lead) RETURN n LIMIT 5")
+```http
+GET {BASE_URL}/health
 ```
 
 ---
 
-## Graph data model
+## 3. API
 
-```
-Channel —[HAS_CAMPAIGN]→ Campaign —[HAS_CONTENT]→ Content
-Account ←[WORKS_AT]— Contact
-Account ←[BELONGS_TO]— Deal
-Deal —[HAS_CONTACT]→ Contact
-Deal —[FOR_PRODUCT]→ Product
-Lead —[SOURCED_FROM]→ Campaign / EmailCampaign
-Lead —[SIGNED_UP_FOR]→ Product
-Lead —[CONVERTED_TO]→ Contact
-Lead ←[HAS_SCORE]— Score
-Campaign —[INFLUENCED]→ Deal
-EmailCampaign —[HAS_EMAIL]→ Email
-Actor —[CREATED_BY]→ * (any entity)
-Actor —[UPDATED_BY]→ * (any entity)
+Every authenticated request:
+
+```http
+Authorization: Bearer <your_api_key>
 ```
 
-**Key relationships:**
-- **WORKS_AT**: Contact/Lead → Account (person works at company)
-- **SOURCED_FROM**: Lead → Campaign (lead attribution)
-- **BELONGS_TO**: Deal → Account (deal is for this company)
-- **HAS_CONTACT**: Deal → Contact (stakeholder on deal)
-- **HAS_SCORE**: Score → Lead (lead scoring)
-- **CONVERTED_TO**: Lead → Contact (lead became a customer contact)
-- **INFLUENCED**: Campaign → Deal (campaign influenced the deal)
-- **HAS_EMAIL**: EmailCampaign → Email (sequence steps)
-- **HAS_CAMPAIGN**: Channel → Campaign (channel groups campaigns)
-- **HAS_CONTENT**: Campaign → Content (campaign drives traffic to content)
-- **SIGNED_UP_FOR**: Lead → Product (lead signed up for a product)
-- **FOR_PRODUCT**: Deal → Product (deal is for a specific product)
-- **CREATED_BY / UPDATED_BY**: Actor → any (audit trail)
+Below, `{BASE}` means the server root (no trailing slash), e.g. `https://example.com`.
+
+### Discovery (still “data” for you)
+
+| Method | Path | Purpose |
+|--------|------|--------|
+| GET | `{BASE}/v1/schema` | Node types, fields, relationship names—use when you’re unsure what exists. |
+| GET | `{BASE}/v1/search?q=...&limit=...` | Find entities by text across types (`limit` 1–100, default 25). |
+
+### CRUD — same pattern for every entity collection
+
+Replace `{entities}` with the path segment (plural, kebab-case if needed):
+
+| Collection path | Typical role |
+|-----------------|---------------|
+| `/v1/accounts` | Companies / orgs |
+| `/v1/leads` | Prospects / inbound records |
+| `/v1/contacts` | People (often post-sale or qualified) |
+| `/v1/deals` | Opportunities |
+| `/v1/campaigns` | Marketing / outbound campaigns |
+| `/v1/email-campaigns` | Sequences with multiple emails |
+| `/v1/emails` | Single email artifacts / steps |
+| `/v1/channels` | Channel grouping (e.g. SEM, paid social) |
+| `/v1/products` | Product lines / SKUs |
+| `/v1/content` | Landing pages, assets |
+
+**Operations**
+
+```http
+POST   {BASE}/v1/{entities}           → create (JSON body)
+GET    {BASE}/v1/{entities}/{id}     → one record
+GET    {BASE}/v1/{entities}?limit=50&offset=0&field=value  → list + equality filters on domain fields
+PATCH  {BASE}/v1/{entities}/{id}      → partial update (JSON body)
+DELETE {BASE}/v1/{entities}/{id}     → delete
+```
+
+- `limit` usually 1–500, `offset` ≥ 0.
+- Query params that match **domain field names** filter by **exact match**. Unknown params are ignored.
+
+**Create / update bodies** must include **`actor_id`** (who is acting—use a stable id for yourself, e.g. `cursor-agent` or the name the human prefers). Optional **`reasoning`** on creates/updates is strongly recommended (see §10).
+
+### Typed links (relationships)
+
+These create graph edges. **`reasoning` is required** on the link payloads (non-empty string explaining *why*).
+
+| Action | Method + path (conceptually) |
+|--------|------------------------------|
+| Lead → campaign | `POST /v1/leads/{lead_id}/link-campaign` body: `campaign_id`, `reasoning` |
+| Campaign → lead | `POST /v1/campaigns/{campaign_id}/add-lead` body: `lead_id`, `reasoning` |
+| Contact → account | `POST /v1/contacts/{contact_id}/assign-account` body: `account_id`, `reasoning` |
+| Deal → account | `POST /v1/deals/{deal_id}/assign-account` body: `account_id`, `reasoning` |
+| Deal → contact | `POST /v1/deals/{deal_id}/add-contact` body: `contact_id`, `reasoning` |
+
+**Scores (only via leads)**
+
+- Do **not** invent a generic “scores” CRUD. Create scores with:
+
+```http
+POST {BASE}/v1/leads/{lead_id}/scores
+```
+
+Body includes **`has_score_reasoning`** (required, non-empty), plus fields like `total`, `score_type`, optional BANT components, `actor_id`, `reasoning`, etc., as in your schema.
+
+**Email campaign + steps + leads in one shot**
+
+```http
+POST {BASE}/v1/email-campaigns/with-artifacts
+```
+
+If `lead_ids` is non-empty, **`sourced_from_reasoning`** is required.
+
+### Neighbourhood of one node (explore)
+
+```http
+GET {BASE}/v1/entities/{entity_id}/explore?depth=1|2&mode=compact|full
+```
+
+- **`depth`**: how many relationship hops from the start node (server clamps to a max, often 1–5).
+- **`mode=compact`** (default): ids grouped by type + lightweight edges—best for **shape** and planning.
+- **`mode=full`**: returns full properties for nodes in the subgraph—**heavy**; see §7. Usually you should stay on **compact** and then **`GET /v1/{entity}/{id}`** for each neighbor you care about instead of using **`full`**.
+
+Responses include `truncated` when caps apply—read it and compensate (narrow query, fetch specific ids, or another hop).
 
 ---
 
-## Critical rules
+## 4. Entities — what they mean (plain language)
 
-1. **`actor_id` is required on every create and update.** It identifies who/what made the change. Use your agent name (e.g. `"sdr-bot"`, `"enrichment-agent"`).
+| Entity | Plain meaning |
+|--------|----------------|
+| **Account** | A company or organization you sell to. |
+| **Lead** | A prospect record (often early stage): form fill, list import, trial signup. |
+| **Contact** | A person record—often tied to an account when they’re a known stakeholder. |
+| **Deal** | A revenue opportunity (amount, stage, dates, etc.). |
+| **Campaign** | A marketing initiative; leads can be **sourced from** campaigns. |
+| **Email campaign** | A multi-step email program; may include many **emails** and enrolled **leads**. |
+| **Email** | One message template/step (subject, body, sequence, send rules). |
+| **Channel** | A grouping dimension for campaigns (e.g. paid search vs organic). |
+| **Product** | Something sold; leads/deals can relate to products per your model. |
+| **Content** | An asset (landing page, doc) campaigns may point to. |
 
-2. **`reasoning` is required on every relationship/link.** Always explain *why* two entities are connected. This is non-negotiable — the API will reject empty reasoning on link methods.
-
-3. **Never create scores directly.** Always use `db.leads.add_score()` or `POST /v1/leads/{id}/scores`. `db.scores.create()` raises `TypeError`.
-
-4. **`name` is auto-derived** for Leads, Contacts, Emails, and Scores. Don't set it manually — it's computed from other fields (first+last name, subject line, score_type:total, etc.).
-
-5. **Lead `status` defaults to `"new"`.** Update it as the lead progresses: `"contacted"`, `"qualified"`, `"unqualified"`, etc.
-
-6. **Email `state` defaults to `"draft"`.** Update when sent.
-
-7. **Tenant isolation is automatic.** Every query is scoped to the tenant in your API key. You cannot see or modify data from other tenants.
-
-8. **Use typed link methods over generic `relationships.create`** when a dedicated method exists (e.g. `contacts.assign_to_account` instead of manually creating a WORKS_AT edge).
-
-9. **Response format:** Entity dicts only include non-null fields. System fields (`id`, `tenant_id`, `created_at`, `updated_at`, `created_by_actor_id`) are included automatically.
-
-10. **Filtering on list:** Pass any domain field as a query parameter for equality filtering. Only known domain fields are used; unknown params are ignored.
+**Scores** are not a separate “free” entity type in your head: they attach to **leads** via the dedicated scores endpoint.
 
 ---
 
-## Common workflows
+## 5. Graph structure — relationships (mental model)
 
-### Inbound lead processing
+Think in **nodes** and **labeled relationships**. Names below match what you’ll see in **`/v1/schema`** and **`explore`** edges.
 
-```python
-db, scope = await connect_gtmdb(api_key=api_key)
+**Common paths**
 
-# 1. Create the lead
-lead = await db.leads.create(scope, actor_id="inbound-processor",
-    first_name="Jane", last_name="Doe", email="jane@acme.com",
-    company_name="Acme Corp", title="VP Engineering",
-    source="demo_request", status="new")
+- **Lead —SOURCED_FROM→ Campaign** (or email campaign path, depending on data)
+- **Lead —WORKS_AT→ Account** (person at company)
+- **Contact —WORKS_AT→ Account**
+- **Deal —BELONGS_TO→ Account**
+- **Deal —HAS_CONTACT→ Contact**
+- **Lead —CONVERTED_TO→ Contact** (lifecycle)
+- **Lead ←HAS_SCORE— Score** (score attaches to lead)
+- **Campaign —INFLUENCED→ Deal** (when modeled)
+- **Channel —HAS_CAMPAIGN→ Campaign**
+- **Campaign —HAS_CONTENT→ Content**
+- **EmailCampaign —HAS_EMAIL→ Email**
 
-# 2. Find or create the account
-accounts = await db.accounts.list(scope, domain="acme.com")
-if accounts:
-    acc = accounts[0]
-else:
-    acc = await db.accounts.create(scope, actor_id="inbound-processor",
-        name="Acme Corp", domain="acme.com")
+**Audit-style links** (who changed what) may appear as actor-linked metadata depending on mode and server; **`actor_id` on your writes** is what you control.
 
-# 3. Link lead to account
-await db.relationships.create(scope, lead.id, "WORKS_AT", acc.id,
-    reasoning="Email domain matches account domain")
-
-# 4. Attribute to campaign
-await db.leads.link_campaign(scope, lead.id, campaign_id,
-    reasoning="Demo request form submission on landing page")
-
-# 5. Score the lead
-await db.leads.add_score(scope, lead.id, actor_id="inbound-processor",
-    has_score_reasoning="Inbound demo request from VP at target account",
-    total=85, score_type="bant",
-    budget=8, authority=9, need=9, timeline=7)
-
-# 6. Qualify
-await db.leads.update(scope, lead.id, actor_id="inbound-processor",
-    status="qualified",
-    reasoning="High BANT score, target ICP, active buying signal")
-
-await db.close()
-```
-
-### REST equivalent of the same workflow
-
-```bash
-# Create lead
-curl -X POST https://gtm-db-production.up.railway.app/v1/leads \
-  -H "Authorization: Bearer $API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"actor_id":"inbound-processor","first_name":"Jane","last_name":"Doe",
-       "email":"jane@acme.com","company_name":"Acme Corp","title":"VP Engineering",
-       "source":"demo_request"}'
-
-# List accounts by domain
-curl "https://gtm-db-production.up.railway.app/v1/accounts?domain=acme.com" \
-  -H "Authorization: Bearer $API_KEY"
-
-# Link lead to campaign
-curl -X POST https://gtm-db-production.up.railway.app/v1/leads/{lead_id}/link-campaign \
-  -H "Authorization: Bearer $API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"campaign_id":"...","reasoning":"Demo request form submission"}'
-
-# Score the lead
-curl -X POST https://gtm-db-production.up.railway.app/v1/leads/{lead_id}/scores \
-  -H "Authorization: Bearer $API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"actor_id":"inbound-processor","has_score_reasoning":"High BANT from VP",
-       "total":85,"score_type":"bant"}'
-```
-
-### Building a deal pipeline
-
-```python
-# Create deal
-deal = await db.deals.create(scope, actor_id="ae-agent",
-    name="Acme enterprise expansion", amount=250000,
-    stage="discovery", probability=0.3)
-
-# Attach to account
-await db.deals.assign_to_account(scope, deal.id, acc.id,
-    reasoning="Expansion deal for existing customer")
-
-# Add stakeholders
-await db.deals.add_contact(scope, deal.id, cto.id,
-    reasoning="Technical decision maker")
-await db.deals.add_contact(scope, deal.id, cfo.id,
-    reasoning="Budget holder, signs off on purchases over 100k")
-
-# Progress the deal
-await db.deals.update(scope, deal.id, actor_id="ae-agent",
-    stage="proposal", probability=0.6,
-    reasoning="Sent proposal after positive technical review")
-```
-
-### Launching an email campaign
-
-```python
-result = await db.email_campaigns.create_with_artifacts(scope,
-    actor_id="nurture-agent",
-    name="Post-webinar nurture",
-    status="active",
-    from_name="Alex from Acme",
-    from_email="alex@acme.com",
-    reply_to="alex@acme.com",
-    emails=[
-        {"subject": "Great meeting you at the webinar",
-         "body": "Hi {{name}},\n\nThanks for attending...",
-         "sequence_number": 1},
-        {"subject": "The ROI calculator I mentioned",
-         "body": "Hi {{name}},\n\nHere's the link...",
-         "sequence_number": 2,
-         "send_at": "2026-04-05T09:00:00Z"},
-        {"subject": "Quick question about your timeline",
-         "body": "Hi {{name}},\n\nWanted to check...",
-         "sequence_number": 3,
-         "send_at": "2026-04-10T09:00:00Z"},
-    ],
-    lead_ids=[lead1.id, lead2.id, lead3.id],
-    sourced_from_reasoning="Attended Q1 product webinar")
-```
+When in doubt, **`GET /v1/schema`** and **`explore?mode=compact`** are the source of truth for *this* deployment.
 
 ---
 
-## Environment variables
+## 6. Implementation detail
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GTMDB_NEO4J_URI` | Yes | Neo4j connection URI |
-| `GTMDB_NEO4J_USER` | Yes | Neo4j username |
-| `GTMDB_NEO4J_PASSWORD` | Yes | Neo4j password |
-| `GTMDB_ADMIN_KEY` | For admin ops | Admin API key |
-| `GTMDB_DEFAULT_TENANT_ID` | No | UUID tenant (default provided) |
-| `GTMDB_KEY_STORE_URL` | For agent keys | Postgres DSN (`postgresql+asyncpg://...`) |
-| `GTMDB_NEO4J_FORCE_DIRECT_BOLT` | No | Set `true` if routing times out (PaaS) |
-| `GTMDB_NEO4J_CONNECTION_TIMEOUT` | No | Driver TCP timeout (seconds) |
-| `GTMDB_NEO4J_CONNECTION_ACQUISITION_TIMEOUT` | No | Pool acquisition timeout (seconds) |
+You don’t need to know **how** the service persists the graph. Treat it as **a governed HTTP API** over a **GTM graph**.
 
 ---
 
-## Error handling
+## 7. Best practices — explore vs entity APIs, depth, compact vs full
 
-| HTTP code | Meaning |
-|-----------|---------|
-| 400 | Missing `actor_id`, empty `reasoning` where required, invalid field values |
-| 401 | Missing or invalid API key |
-| 403 | Insufficient permissions (scope doesn't allow this operation) |
-| 404 | Entity or key not found |
+### When to use **`GET /v1/{entities}/{id}`**
 
-In the Python SDK, these map to `ValueError` (400), `PermissionError` (403), and `None` returns (404 on get).
+- You **already have the id** (from search, from a previous response, or the user pasted it).
+- You need **full fields** for **one** record.
+- You’re about to **update** or **delete** that record.
+
+### When to use **`GET /v1/{entities}?...`**
+
+- You want a **flat list** filtered by a field (e.g. all deals in stage `proposal`, accounts with `domain=acme.com`).
+- You do **not** need relationship context yet.
+
+### When to use **`/v1/search`**
+
+- The human gave a **name, email fragment, or keyword** and you don’t know the **type** or **id**.
+- You want **quick candidates**; then **GET by id** or **explore** from the winner.
+
+### When to use **`explore` with `depth=1`**
+
+- You have one id and need **immediate neighbours only** (e.g. “this deal’s account” or “this lead’s campaigns” if one hop).
+- Use **`mode=compact` first** to see **types + topology** cheaply.
+
+### When to use **`explore` with `depth=2`**
+
+- The question needs **two hops** in one round trip (e.g. lead → campaign → channel, or contact → deal → account) **and** you want the API to walk it for you.
+- If you would otherwise chain **many** GETs just to “walk the graph,” prefer **`depth=2`** (within server limits).
+
+### When to use **`mode=compact` vs `mode=full`**
+
+| Mode | Use it when |
+|------|-------------|
+| **compact** | Mapping **what’s connected**, collecting **ids** and **edge types**, minimizing payload. **Default choice.** |
+| **`full`** | Rarely. Only when you truly need **full properties for many related nodes in one response** and pulling each record separately is unreasonable. |
+
+**Prefer targeted entity reads over `mode=full`**
+
+After **`explore?...&mode=compact`**, you already have **neighbor ids** grouped by type (e.g. `Campaign`, `Account`). In most cases you should **not** switch to `mode=full`. Instead, **fetch only what you need** with the normal CRUD route:
+
+```http
+GET {BASE}/v1/campaigns/{id}
+GET {BASE}/v1/accounts/{id}
+```
+
+That keeps payloads small, respects **field-level permissions** more predictably, and avoids dumping unrelated fields for every node in the subgraph. Use **`mode=full`** only when the human explicitly wants a **single bulk snapshot** or when the number of follow-up GETs would be excessive **and** compact truly lacks the ids you need (it shouldn’t, if explore succeeded).
+
+**Practical recipe**
+
+1. **Search** or **list** to get a candidate **id**.  
+2. **`explore?depth=1&mode=compact`** to see what’s attached and **collect related ids**.  
+3. If the answer needs **one more hop**, **`depth=2`**—still **`mode=compact`**.  
+4. For **fields** on specific neighbors, call **`GET /v1/{entity}/{id}`** per entity you care about (parallelize in code if appropriate).  
+5. Reserve **`mode=full`** for exceptional **whole-neighborhood** property dumps.  
+6. If **`truncated`** is non-empty, narrow the question, reduce depth, or **GET** the critical ids explicitly.
+
+### When multiple separate queries are still OK
+
+- You need **two unrelated** subgraphs (two different leads)—run **two** explores or GETs.
+- **Permissions** might hide part of the graph; smaller targeted calls make gaps easier to explain to the human.
 
 ---
 
-## Permission presets (for admin key creation)
+## 8. Question → answer patterns (examples)
 
-| Preset | Description |
-|--------|-------------|
-| `full_access` | Read and write all entity types |
-| `read_all` | Read-only access to all entity types |
-| `write_all` | Write access to all entity types |
-| `no_raw_content` | Deny read on sensitive fields (email body, etc.) |
+Use these as **playbooks**. Replace `{BASE}` and ids with real values.
 
-Combine with commas: `["write_all", "no_raw_content"]`
+### One hop — use **GET** or **explore depth=1**
+
+**Q:** “What’s this deal’s amount and stage?”  
+**A:** `GET /v1/deals/{deal_id}` — single resource.
+
+**Q:** “Which account is this deal for?”  
+**A:** `GET /v1/deals/{deal_id}` if `account_id` is denormalized on the deal **or** `GET .../explore?depth=1&mode=compact` and look for **BELONGS_TO** to an **Account**.
+
+**Q:** “What campaigns is this lead tied to?”  
+**A:** `explore` from `lead_id`, `depth=1`, `mode=compact`; find **SOURCED_FROM** (or equivalent) edges to **Campaign** / **EmailCampaign**.
+
+### Two hops — prefer **`explore depth=2`** (or two steps if clearer)
+
+**Q:** “For this **contact**, which **campaigns** influenced their **account’s** deals?”  
+**A:** Often: `explore` from **contact** `depth=2` `mode=compact` to see **Contact → Deal / Account → Campaign** patterns, then **GET** specific campaign ids for names/budgets. If the graph paths aren’t obvious, split: contact → deals → campaigns.
+
+**Q:** “Lead → which campaign → which channel?”  
+**A:** `explore?depth=2&mode=compact` from **lead_id**; trace **SOURCED_FROM** then **HAS_CAMPAIGN** / channel edges per schema.
+
+**Q:** “Show me everything one step out, then I’ll ask for step two.”  
+**A:** `depth=1` first (compact); then either **`depth=2`** from the same root **or** second **explore** from a **new** id you discovered.
+
+### Finding ids first
+
+**Q:** “Find anything mentioning ‘Acme’.”  
+**A:** `GET /v1/search?q=Acme&limit=25` → pick types/ids → **GET** or **explore**.
+
+**Q:** “Deals stuck in negotiation over $100k.”  
+**A:** If the API supports filtering those fields: `GET /v1/deals?stage=negotiation` then filter **amount** client-side **or** use search if text-only.
+
+### Writes — always **`actor_id`** + link **reasoning**
+
+**Q:** “Attach this lead to campaign X.”  
+**A:** `POST /v1/leads/{lead_id}/link-campaign` with `campaign_id`, **`reasoning`**, and ensure **`actor_id`** on any related create/update the human asked for.
+
+**Q:** “Create a lead from this form payload.”  
+**A:** `POST /v1/leads` with fields + **`actor_id`** + optional **`reasoning`** on the create.
+
+### Multi-step reasoning (you, the agent)
+
+**Q:** “Summarize this lead’s journey.”  
+**A:**  
+1) `GET /v1/leads/{id}` for core fields.  
+2) `explore?depth=2&mode=compact` for graph shape.  
+3) `GET` a few **campaign** / **account** ids for names.  
+4) **Narrate in plain English** (see §11)—don’t dump raw JSON unless asked.
+
+**Q:** “We need two hops but explore truncated.”  
+**A:** Tell the human **truncation** happened; rerun with **smaller depth**, **targeted search**, or **explicit GET** for the missing ids listed in `truncated`.
+
+---
+
+## 9. Error handling
+
+| HTTP | What it usually means | What you should do |
+|------|------------------------|-------------------|
+| **400** | Bad body (missing **`actor_id`** where required, empty **`reasoning`** on links, invalid field) | Fix the payload; quote `detail` from the response to the human if useful. |
+| **401** | Missing/invalid API key | Ask the human to verify the key. |
+| **403** | **Not allowed** for this key (read/write/field masked) | Explain **you aren’t permitted**, not “data doesn’t exist.” Suggest they adjust the key policy with their admin. |
+| **404** | Unknown id or route | Id may be wrong, deleted, or outside tenant. Confirm id and tenant. |
+
+**Network / 5xx** — retry with backoff once or twice; if it persists, stop and tell the human the service is unhealthy.
+
+---
+
+## 10. Reasoning on writes — treat it as mandatory discipline
+
+On **creates** and **updates**, include **`reasoning`** whenever the API allows it and whenever it helps a human understand **why** the change happened.
+
+On **relationship / link** endpoints, **`reasoning` is required**—empty explanations should fail.
+
+On **scores**, **`has_score_reasoning`** (and related fields) carry the same obligation: explain **why** that score exists.
+
+This is how **autonomous** actions stay **reviewable**.
+
+---
+
+## 11. Talk to humans in human language
+
+You will work with **JSON**, **ids**, and **relationship types** internally. **Do not** paste huge raw responses unless the user asks.
+
+**Default**
+
+- Short **summary** (bullets or a tight paragraph).
+- Mention **key entities by name** (company, person, campaign) once you’ve fetched those fields.
+- If something was **blocked by permissions**, say so plainly.
+- If you **guessed** an id from search, say it was the **best match** and what you’d verify next.
+
+---
+
+## Quick reference — minimal HTTP examples
+
+```http
+GET {BASE}/v1/schema
+Authorization: Bearer $GTMDB_API_KEY
+```
+
+```http
+GET {BASE}/v1/search?q=acme&limit=10
+Authorization: Bearer $GTMDB_API_KEY
+```
+
+```http
+GET {BASE}/v1/entities/{id}/explore?depth=2&mode=compact
+Authorization: Bearer $GTMDB_API_KEY
+```
+
+```http
+POST {BASE}/v1/leads
+Authorization: Bearer $GTMDB_API_KEY
+Content-Type: application/json
+
+{
+  "actor_id": "my-agent",
+  "first_name": "Jane",
+  "last_name": "Doe",
+  "email": "jane@example.com",
+  "company_name": "Example Co",
+  "reasoning": "Inbound trial signup from pricing page"
+}
+```
+
+```http
+POST {BASE}/v1/leads/{lead_id}/link-campaign
+Authorization: Bearer $GTMDB_API_KEY
+Content-Type: application/json
+
+{
+  "campaign_id": "...",
+  "reasoning": "UTM on form matched Q1 outbound campaign"
+}
+```
+
+
