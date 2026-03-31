@@ -18,6 +18,7 @@ NODE_LABELS = [
     "EmailCampaign",
     "Channel",
     "Product",
+    "ProductAccount",
     "Ticket",
     "Insight",
     "Agent",
@@ -63,6 +64,7 @@ LOOKUP_INDEXES = [
     "CREATE INDEX IF NOT EXISTS FOR (n:EmailCampaign) ON (n.status)",
     "CREATE INDEX IF NOT EXISTS FOR (n:Channel) ON (n.name)",
     "CREATE INDEX IF NOT EXISTS FOR (n:Product) ON (n.name)",
+    "CREATE INDEX IF NOT EXISTS FOR (n:ProductAccount) ON (n.external_id)",
     "CREATE INDEX IF NOT EXISTS FOR (n:Content) ON (n.url)",
     "CREATE INDEX IF NOT EXISTS FOR (n:Visitor) ON (n.visitor_id)",
     "CREATE INDEX IF NOT EXISTS FOR (n:SubscriptionEvent) ON (n.event_type)",
@@ -72,9 +74,9 @@ LOOKUP_INDEXES = [
 FULLTEXT_INDEXES = [
     (
         "CREATE FULLTEXT INDEX entity_search IF NOT EXISTS "
-        "FOR (n:Account|Contact|Lead|Deal|Campaign|Channel|Product|Content|Visitor|SubscriptionEvent) "
+        "FOR (n:Account|Contact|Lead|Deal|Campaign|Channel|Product|ProductAccount|Content|Visitor|SubscriptionEvent) "
         "ON EACH [n.name, n.first_name, n.last_name, n.email, n.company_name, "
-        "n.visitor_id, n.source_channel, n.product_name]"
+        "n.visitor_id, n.source_channel, n.product_name, n.external_id]"
     ),
 ]
 

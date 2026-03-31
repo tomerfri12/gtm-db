@@ -26,6 +26,7 @@ from gtmdb.server.routers import (
     explore,
     health,
     leads,
+    product_accounts,
     products,
     schema,
     search,
@@ -79,6 +80,7 @@ def create_app() -> FastAPI:
     v1.include_router(campaigns.router)
     v1.include_router(channels.router)
     v1.include_router(products.router)
+    v1.include_router(product_accounts.router)
     v1.include_router(content.router)
     v1.include_router(emails.router)
     v1.include_router(email_campaigns.router)

@@ -38,6 +38,7 @@ from gtmdb.api.models import (
     EmailCampaign,
     Entity,
     Lead,
+    ProductAccount,
     Relationship,
     Score,
     SubscriptionEvent,
@@ -45,6 +46,7 @@ from gtmdb.api.models import (
 )
 from gtmdb.api.scores import ScoresAPI
 from gtmdb.api.subscription_events import SubscriptionEventsAPI
+from gtmdb.api.product_accounts import ProductAccountsAPI
 from gtmdb.api.relationships import RelationshipsAPI
 
 __all__ = [
@@ -66,6 +68,8 @@ __all__ = [
     "Entity",
     "Lead",
     "LeadsAPI",
+    "ProductAccount",
+    "ProductAccountsAPI",
     "Relationship",
     "RelationshipsAPI",
     "Score",

@@ -143,6 +143,15 @@ class Product(Entity):
 
 
 @dataclass
+class ProductAccount(Entity):
+    """Customer workspace / tenant in one product—distinct from the company Account."""
+
+    external_id: str | None = None
+    name: str | None = None
+    status: str | None = None
+
+
+@dataclass
 class Content(Entity):
     """Marketing asset — landing page, blog post, whitepaper, case study, etc."""
 

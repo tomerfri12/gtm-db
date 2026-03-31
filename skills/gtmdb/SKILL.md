@@ -1,6 +1,6 @@
 ---
 name: gtmdb
-description: GtmDB — GTM system of record as a graph (accounts, leads, contacts, deals, campaigns, visitors, subscription events, links). REST or code (curl, httpx, Python SDK) with scoped API keys; prefer compact explore + targeted GET over mode=full. Reasoning on writes.
+description: GtmDB — GTM system of record as a graph (accounts, product accounts, products, leads, contacts, deals, campaigns, visitors, subscription events, links). REST or code (curl, httpx, Python SDK) with scoped API keys; prefer compact explore + targeted GET over mode=full. Reasoning on writes.
 metadata: {"openclaw": {"requires": {"bins": ["python3"]}, "homepage": "https://github.com/tomerfri12/gtm-db"}}
 ---
 
@@ -26,7 +26,7 @@ That matches the product intent in the official docs: **one system of record for
 
 **GtmDB** exposes that system of record as a **graph**:
 
-- **Nodes** are entities: accounts, leads, contacts, deals, campaigns, visitors, subscription lifecycle events, email programs, content, products, etc.
+- **Nodes** are entities: accounts (companies), product accounts (workspace in a product), products, leads, contacts, deals, campaigns, visitors, subscription lifecycle events, email programs, content, etc.
 - **Relationships** carry meaning the business cares about: e.g. a lead **sourced from** a campaign, a contact **works at** an account, a deal **belongs to** an account, stakeholders **on** a deal.
 
 ### Why that helps **you** (the agent)
@@ -150,6 +150,7 @@ Replace `{entities}` with the path segment (plural, kebab-case if needed):
 | `/v1/emails` | Single email artifacts / steps |
 | `/v1/channels` | Channel grouping (e.g. SEM, paid social) |
 | `/v1/products` | Product lines / SKUs |
+| `/v1/product-accounts` | Customer workspace in one product; upstream id in `external_id` (not the company id) |
 | `/v1/content` | Landing pages, assets |
 | `/v1/visitors` | Site visitors (anonymous or identified); upstream id in `visitor_id` |
 | `/v1/subscription-events` | Signup, purchase, churn, etc. (timestamps and plan fields) |
@@ -183,7 +184,7 @@ These create graph edges. **`reasoning` is required** on the link payloads (non-
 
 **Visitor, subscription events, and attribution edges**
 
-There are no dedicated REST “link” routes for **TOUCHED**, **SIGNED_UP_AS**, or **HAS_SUBSCRIPTION_EVENT** yet. Use the Python SDK **`db.relationships.create(..., reasoning="…")`** with the relationship types listed in §5, subject to your key’s policies.
+There are no dedicated REST “link” routes for **TOUCHED**, **SIGNED_UP_AS**, **HAS_SUBSCRIPTION_EVENT**, **BELONGS_TO** (product account → company), or **FOR_PRODUCT** (product account → product line) yet. Use the Python SDK **`db.relationships.create(..., reasoning="…")`** with the relationship types listed in §5, subject to your key’s policies.
 
 **Scores (only via leads)**
 
@@ -222,6 +223,7 @@ Responses include `truncated` when caps apply—read it and compensate (narrow q
 | Entity | Plain meaning |
 |--------|----------------|
 | **Account** | A company or organization you sell to. |
+| **ProductAccount** | The customer’s **account inside one product** (e.g. their id in your CRM app)—different from the company **Account**. Use **`external_id`** for that product-system id; link **`BELONGS_TO`** → company **Account** and **`FOR_PRODUCT`** → **Product**. |
 | **Lead** | A prospect record (often early stage): form fill, list import, trial signup. |
 | **Contact** | A person record—often tied to an account when they’re a known stakeholder. |
 | **Deal** | A revenue opportunity (amount, stage, dates, etc.). |
@@ -231,8 +233,8 @@ Responses include `truncated` when caps apply—read it and compensate (narrow q
 | **Channel** | A grouping dimension for campaigns (e.g. paid search vs organic). |
 | **Product** | Something sold; leads/deals can relate to products per your model. |
 | **Content** | An asset (landing page, doc) campaigns may point to. |
-| **Visitor** | A visitor record (often pre-account): external `visitor_id`, first touch channel/time. Links to **campaigns** via **TOUCHED** and optionally to an **account** via **SIGNED_UP_AS** when you model signup attribution. |
-| **SubscriptionEvent** | A point-in-time subscription milestone: `event_type` (e.g. signup, purchase, churn), `occurred_at`, plan tier/period, optional ARR. Typically hangs off an **account** via **HAS_SUBSCRIPTION_EVENT** and may link to a **product** via **FOR_PRODUCT**. |
+| **Visitor** | A visitor record (often pre-account): external `visitor_id`, first touch channel/time. Links to **campaigns** via **TOUCHED** and optionally to a **ProductAccount** or company **Account** via **SIGNED_UP_AS** when you model signup attribution. |
+| **SubscriptionEvent** | A point-in-time subscription milestone: `event_type` (e.g. signup, purchase, churn), `occurred_at`, plan tier/period, optional ARR. Typically hangs off a **ProductAccount** or company **Account** via **HAS_SUBSCRIPTION_EVENT** and may link to a **product** via **FOR_PRODUCT**. |
 
 **Scores** are not a separate “free” entity type in your head: they attach to **leads** via the dedicated scores endpoint.
 
@@ -248,6 +250,8 @@ Think in **nodes** and **labeled relationships**. Names below match what you’l
 - **Lead —WORKS_AT→ Account** (person at company)
 - **Contact —WORKS_AT→ Account**
 - **Deal —BELONGS_TO→ Account**
+- **ProductAccount —BELONGS_TO→ Account** (workspace belongs to the company)
+- **ProductAccount —FOR_PRODUCT→ Product** (which product line this workspace is)
 - **Deal —HAS_CONTACT→ Contact**
 - **Lead —CONVERTED_TO→ Contact** (lifecycle)
 - **Lead ←HAS_SCORE— Score** (score attaches to lead)
@@ -256,9 +260,9 @@ Think in **nodes** and **labeled relationships**. Names below match what you’l
 - **Campaign —HAS_CONTENT→ Content**
 - **EmailCampaign —HAS_EMAIL→ Email**
 - **Visitor —TOUCHED→ Campaign** (touch / ad context; edge properties may hold ad group, landing page, timestamps)
-- **Visitor —SIGNED_UP_AS→ Account** (when a visitor is tied to a signed-up account)
-- **Account —HAS_SUBSCRIPTION_EVENT→ SubscriptionEvent**
-- **SubscriptionEvent —FOR_PRODUCT→ Product** (same relationship type as **Deal —FOR_PRODUCT→ Product**; direction is subscription event or deal → product)
+- **Visitor —SIGNED_UP_AS→ Account** or **ProductAccount** (signed-up customer record)
+- **Account** or **ProductAccount —HAS_SUBSCRIPTION_EVENT→ SubscriptionEvent**
+- **SubscriptionEvent —FOR_PRODUCT→ Product** (same type as **Deal —FOR_PRODUCT→ Product** and **ProductAccount —FOR_PRODUCT→ Product**)
 
 **Audit-style links** (who changed what) may appear as actor-linked metadata depending on mode and server; **`actor_id` on your writes** is what you control.
 

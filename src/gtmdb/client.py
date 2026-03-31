@@ -23,6 +23,7 @@ from gtmdb.api.content import ContentAPI
 from gtmdb.api.deals import DealsAPI
 from gtmdb.api.leads import LeadsAPI
 from gtmdb.api.visitors import VisitorsAPI
+from gtmdb.api.product_accounts import ProductAccountsAPI
 from gtmdb.api.products import ProductsAPI
 from gtmdb.api.scores import ScoresAPI
 from gtmdb.api.subscription_events import SubscriptionEventsAPI
@@ -49,6 +50,7 @@ class GtmDB:
         self._campaigns: CampaignsAPI | None = None
         self._channels: ChannelsAPI | None = None
         self._products: ProductsAPI | None = None
+        self._product_accounts: ProductAccountsAPI | None = None
         self._content: ContentAPI | None = None
         self._emails: EmailsAPI | None = None
         self._email_campaigns: EmailCampaignAPI | None = None
@@ -155,6 +157,12 @@ class GtmDB:
         if self._products is None:
             self._products = ProductsAPI(self._graph)
         return self._products
+
+    @property
+    def product_accounts(self) -> ProductAccountsAPI:
+        if self._product_accounts is None:
+            self._product_accounts = ProductAccountsAPI(self._graph)
+        return self._product_accounts
 
     @property
     def content(self) -> ContentAPI:
