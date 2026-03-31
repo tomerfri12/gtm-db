@@ -346,6 +346,8 @@
             <li><a href="#leads">Lead</a></li>
             <li><a href="#deals">Deal</a></li>
             <li><a href="#campaigns">Campaign</a></li>
+            <li><a href="#visitors">Visitor</a></li>
+            <li><a href="#subscription-events">Subscription event</a></li>
             <li><a href="#entity-roadmap">GTM entity model</a></li>
             <li><a href="#quotes">Quote</a></li>
             <li><a href="#orders">Order</a></li>
@@ -479,15 +481,15 @@
       <p>
         Under the hood, GTMDB stores CRM entities as <strong>nodes and relationships</strong> in
         <strong>Neo4j</strong> (labels such as <code>Lead</code>, <code>Account</code>, <code>Deal</code>,
-        etc.). That choice enables graph traversals (360° views, timelines, attribution paths, search).
+        <code>Visitor</code>, <code>SubscriptionEvent</code>, etc.). That choice enables graph traversals (360° views, timelines, attribution paths, search).
         Applications integrate through the <code>GtmDB</code> client; optional <strong>SQLAlchemy
         metadata</strong> defines an <code>AccessToken</code> table so you can persist issued tokens in
         your app database (CRM2 does this); the token row holds JSON policies that drive authorization.
       </p>
       <h3>What this library includes</h3>
       <ul class="params" style="color: var(--text);">
-        <li><strong><code>GtmDB</code></strong> — async entrypoint: <code>connect_gtmdb</code> / <code>close</code>, typed sub-APIs (<code>leads</code>, <code>accounts</code>, <code>contacts</code>, <code>deals</code>, <code>campaigns</code>, <code>emails</code>, <code>email_campaigns</code>), <code>relationships</code>, low-level <code>NodeData</code>/<code>EdgeData</code>, and read helpers (<code>search</code>, <code>pipeline</code>, <code>entity_360</code>, <code>explore_subgraph</code>, …).</li>
-        <li><strong>Typed entity layer</strong> — dataclasses (<code>Lead</code>, <code>Account</code>, …) and CRUD with filtering, updates, and convenience methods (e.g. <code>contacts.assign_to_account</code>, <code>leads.link_campaign</code>, <code>campaigns.add_lead</code>).</li>
+        <li><strong><code>GtmDB</code></strong> — async entrypoint: <code>connect_gtmdb</code> / <code>close</code>, typed sub-APIs (<code>leads</code>, <code>accounts</code>, <code>contacts</code>, <code>deals</code>, <code>campaigns</code>, <code>channels</code>, <code>products</code>, <code>content</code>, <code>visitors</code>, <code>subscription_events</code>, <code>emails</code>, <code>email_campaigns</code>), <code>relationships</code>, low-level <code>NodeData</code>/<code>EdgeData</code>, and read helpers (<code>search</code>, <code>pipeline</code>, <code>entity_360</code>, <code>explore_subgraph</code>, …).</li>
+        <li><strong>Typed entity layer</strong> — dataclasses (<code>Lead</code>, <code>Account</code>, <code>Visitor</code>, <code>SubscriptionEvent</code>, …) and CRUD with filtering, updates, and convenience methods (e.g. <code>contacts.assign_to_account</code>, <code>leads.link_campaign</code>, <code>campaigns.add_lead</code>).</li>
         <li><strong><code>Scope</code></strong> — evaluates JSON <em>policies</em> for every operation: read/write on node labels and relationship types, optional per-record <code>ids</code> scoping, field-level <strong>masking</strong> (denylist / allowlist), and <strong>redaction</strong> when a row exists but must not be fully revealed.</li>
         <li><strong><code>AccessToken</code></strong> — SQLAlchemy model: <code>tenant_id</code>, <code>owner_id</code>, <code>owner_type</code>, <code>policies</code> (JSON string), <code>redact_mode</code>, <code>label</code>, <code>is_active</code>, timestamps.</li>
         <li><strong><code>create_token_from_presets</code> + <code>PRESETS</code></strong> — compose tokens from named policy bundles (<code>full_access</code>, <code>read_all</code>, <code>write_all</code>, <code>no_raw_content</code>) plus optional <code>custom_presets</code> and <code>extra_policies</code>.</li>
@@ -523,7 +525,7 @@
         </tbody>
       </table>
       <h3>Entity CRUD (uniform)</h3>
-      <p>Types: <code>leads</code>, <code>accounts</code>, <code>contacts</code>, <code>deals</code>, <code>campaigns</code>, <code>emails</code>, <code>email-campaigns</code>.</p>
+      <p>Types: <code>leads</code>, <code>accounts</code>, <code>contacts</code>, <code>deals</code>, <code>campaigns</code>, <code>channels</code>, <code>products</code>, <code>content</code>, <code>visitors</code>, <code>subscription-events</code>, <code>emails</code>, <code>email-campaigns</code>.</p>
       <pre><code>POST   /v1/{type}              JSON body: domain fields + optional actor_id, reasoning
 GET    /v1/{type}/{id}
 GET    /v1/{type}?limit=&amp;offset=&amp;…   equality filters on domain fields
@@ -550,7 +552,7 @@ DELETE /v1/{type}/{id}</code></pre>
       <p>
         The <strong>unified GTM record</strong> spans companies (<code>Account</code>), people
         (<code>Contact</code>), prospects (<code>Lead</code>), opportunities (<code>Deal</code>), programs
-        (<code>Campaign</code>, <code>EmailCampaign</code>, <code>Email</code>), and the wider types in <a href="#entity-roadmap">GTM entity model</a>—all
+        (<code>Campaign</code>, <code>EmailCampaign</code>, <code>Email</code>), acquisition (<code>Visitor</code>, <code>SubscriptionEvent</code>), and the wider types in <a href="#entity-roadmap">GTM entity model</a>—all
         linkable in one graph. The sections below use the shared <code>create</code> /
         <code>get</code> / <code>list</code> / <code>update</code> / <code>delete</code> pattern; examples pass
         a <code>scope</code> argument. Build a <code>Scope</code> from an access token as described under
@@ -858,6 +860,58 @@ await db.campaigns.delete(scope, cmp.id)</code></pre>
         </tbody>
       </table>
 
+      <h2 id="visitors">Visitor <code>db.visitors</code></h2>
+      <p>
+        A <strong>Visitor</strong> is a <em>site or ad visitor</em> before or alongside a full CRM person record:
+        store an upstream identifier in <code>visitor_id</code>, optional <code>source_channel</code>, and
+        <code>first_seen_at</code>. Link to <strong>Campaign</strong> with a <code>TOUCHED</code> edge and to
+        <strong>Account</strong> with <code>SIGNED_UP_AS</code> when modeling signup attribution (use
+        <code>db.relationships.create</code> with required <code>reasoning</code>).
+      </p>
+      <p><strong>Python type:</strong> <code>from gtmdb import Visitor</code> —
+        <code>visitor_id</code>, <code>source_channel</code>, <code>first_seen_at</code>.
+      </p>
+      <p><strong>REST:</strong> <code>POST/GET/PATCH/DELETE /v1/visitors</code> — same uniform CRUD as other entities; body includes <code>actor_id</code> on writes.</p>
+      <pre><code>from gtmdb import Visitor
+
+v = await db.visitors.create(
+    scope,
+    actor_id=ACTOR,
+    visitor_id="upstream-visitor-123",
+    source_channel="sem",
+    first_seen_at="2026-01-15T12:00:00+00:00",
+)
+await db.relationships.create(
+    scope, v.id, "TOUCHED", campaign_id,
+    reasoning="First touch from paid search export",
+)</code></pre>
+
+      <h2 id="subscription-events">SubscriptionEvent <code>db.subscription_events</code></h2>
+      <p>
+        A <strong>SubscriptionEvent</strong> is a <em>lifecycle point</em> on an account: signup, purchase,
+        churn, etc. Use <code>event_type</code> and <code>occurred_at</code>; optional commercial fields include
+        <code>plan_tier</code>, <code>plan_period</code>, <code>arr</code>, <code>days_from_signup</code>, <code>product_name</code>.
+        Attach to an <strong>Account</strong> with <code>HAS_SUBSCRIPTION_EVENT</code> and to <strong>Product</strong> with
+        <code>FOR_PRODUCT</code> (same type as deals use) via <code>db.relationships.create</code>.
+      </p>
+      <p><strong>Python type:</strong> <code>from gtmdb import SubscriptionEvent</code> — fields above.</p>
+      <p><strong>REST:</strong> <code>POST/GET/PATCH/DELETE /v1/subscription-events</code> — uniform CRUD.</p>
+      <pre><code>from gtmdb import SubscriptionEvent
+
+ev = await db.subscription_events.create(
+    scope,
+    actor_id=ACTOR,
+    event_type="purchase",
+    occurred_at="2026-02-01T00:00:00+00:00",
+    plan_tier="pro",
+    plan_period="yearly",
+    arr=12000.0,
+)
+await db.relationships.create(
+    scope, account_id, "HAS_SUBSCRIPTION_EVENT", ev.id,
+    reasoning="Account payment event from billing export",
+)</code></pre>
+
       <h2 id="email-campaigns">EmailCampaign <code>db.email_campaigns</code></h2>
       <p>
         An <strong>EmailCampaign</strong> is a marketing program specialized for email: it inherits all
@@ -1055,6 +1109,10 @@ await db.deals.add_contact(scope, d.id, c.id, reasoning="Champion on deal")</cod
 )
 rels = await db.relationships.list(scope, node_id, rel_type="WORKS_AT", direction="out")
 await db.relationships.delete(scope, lead_id, "WORKS_AT", account_id)</code></pre>
+      <p><strong>Attribution &amp; lifecycle (v1 schema):</strong> in addition to edges above, the introspection schema includes
+        <code>TOUCHED</code> (Visitor → Campaign), <code>SIGNED_UP_AS</code> (Visitor → Account),
+        <code>HAS_SUBSCRIPTION_EVENT</code> (Account → SubscriptionEvent), and <code>FOR_PRODUCT</code> from
+        <strong>Deal</strong> or <strong>SubscriptionEvent</strong> to <strong>Product</strong>. See <code>GET /v1/schema</code>.</p>
 
       <h3 id="edge-reasoning">Relationship properties &amp; <code>reasoning</code></h3>
       <p>
@@ -1225,8 +1283,8 @@ await db.close()</code></pre>
       <h3 id="policy-resources">Resource strings</h3>
       <ul class="params">
         <li><code>"*"</code> — matches any resource (whole types).</li>
-        <li><code>"Lead"</code>, <code>"Deal"</code>, … — node <strong>label</strong> (case-insensitive match in evaluator). Used for entity CRUD and reads.</li>
-        <li><code>"WORKS_AT"</code>, <code>"INFLUENCED"</code>, … — <strong>relationship type</strong> for edge create/delete and write checks.</li>
+        <li><code>"Lead"</code>, <code>"Deal"</code>, <code>"Visitor"</code>, <code>"SubscriptionEvent"</code>, … — node <strong>label</strong> (case-insensitive match in evaluator). Used for entity CRUD and reads.</li>
+        <li><code>"WORKS_AT"</code>, <code>"INFLUENCED"</code>, <code>"TOUCHED"</code>, <code>"SIGNED_UP_AS"</code>, <code>"HAS_SUBSCRIPTION_EVENT"</code>, … — <strong>relationship type</strong> for edge create/delete and write checks.</li>
         <li><code>"deal.amount"</code> — field-level resource: <code>&lt;label&gt;.&lt;property&gt;</code> (lowercase label in practice). Used with <code>read</code> for allowlist/denylist masking.</li>
       </ul>
 

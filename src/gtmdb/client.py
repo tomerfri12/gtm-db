@@ -22,8 +22,10 @@ from gtmdb.api.contacts import ContactsAPI
 from gtmdb.api.content import ContentAPI
 from gtmdb.api.deals import DealsAPI
 from gtmdb.api.leads import LeadsAPI
+from gtmdb.api.visitors import VisitorsAPI
 from gtmdb.api.products import ProductsAPI
 from gtmdb.api.scores import ScoresAPI
+from gtmdb.api.subscription_events import SubscriptionEventsAPI
 from gtmdb.api.relationships import RelationshipsAPI
 from gtmdb.api._common import optional_reasoning, require_non_empty_str
 from gtmdb.config import GtmdbSettings
@@ -50,6 +52,8 @@ class GtmDB:
         self._content: ContentAPI | None = None
         self._emails: EmailsAPI | None = None
         self._email_campaigns: EmailCampaignAPI | None = None
+        self._visitors: VisitorsAPI | None = None
+        self._subscription_events: SubscriptionEventsAPI | None = None
         self._relationships: RelationshipsAPI | None = None
         self._actors: ActorsAPI | None = None
         self._api_keys: ApiKeysManager | None = None
@@ -93,7 +97,11 @@ class GtmDB:
     def api_keys(self) -> ApiKeysManager:
         if self._api_keys is None:
             from gtmdb.api_keys import ApiKeysManager
-            self._api_keys = ApiKeysManager(self._get_key_store())
+
+            if self._settings.key_store_url:
+                self._api_keys = ApiKeysManager(self._get_key_store())
+            else:
+                self._api_keys = ApiKeysManager(None)
         return self._api_keys
 
     # ------------------------------------------------------------------
@@ -159,6 +167,18 @@ class GtmDB:
         if self._emails is None:
             self._emails = EmailsAPI(self._graph)
         return self._emails
+
+    @property
+    def visitors(self) -> VisitorsAPI:
+        if self._visitors is None:
+            self._visitors = VisitorsAPI(self._graph)
+        return self._visitors
+
+    @property
+    def subscription_events(self) -> SubscriptionEventsAPI:
+        if self._subscription_events is None:
+            self._subscription_events = SubscriptionEventsAPI(self._graph)
+        return self._subscription_events
 
     @property
     def email_campaigns(self) -> EmailCampaignAPI:

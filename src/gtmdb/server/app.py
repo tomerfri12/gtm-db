@@ -29,6 +29,8 @@ from gtmdb.server.routers import (
     products,
     schema,
     search,
+    subscription_events,
+    visitors,
 )
 
 
@@ -80,6 +82,8 @@ def create_app() -> FastAPI:
     v1.include_router(content.router)
     v1.include_router(emails.router)
     v1.include_router(email_campaigns.router)
+    v1.include_router(visitors.router)
+    v1.include_router(subscription_events.router)
     app.include_router(v1)
 
     app.add_middleware(ActivityLogMiddleware)

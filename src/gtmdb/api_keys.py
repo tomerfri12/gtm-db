@@ -78,11 +78,22 @@ class ApiKeysManager:
     Admin methods (create / revoke / rotate / list) require a bound scope
     with ``owner_type == "admin"``.  Call :meth:`bind_scope` after connect
     to enable them.  :meth:`resolve` is always available (used at connect time).
+
+    ``store`` may be ``None`` when only :meth:`bind_scope` is needed (e.g. admin
+    :func:`~gtmdb.connect.connect_gtmdb` without ``GTMDB_KEY_STORE_URL``); agent
+    :meth:`resolve` and key CRUD require a real store.
     """
 
-    def __init__(self, store: KeyStore) -> None:
+    def __init__(self, store: KeyStore | None) -> None:
         self._store = store
         self._scope: Scope | None = None
+
+    def _require_store(self) -> KeyStore:
+        if self._store is None:
+            raise RuntimeError(
+                "Key store not configured. Set GTMDB_KEY_STORE_URL to a Postgres DSN."
+            )
+        return self._store
 
     def bind_scope(self, scope: Scope) -> None:
         """Attach the caller's scope so admin guards can be evaluated."""
@@ -143,7 +154,7 @@ class ApiKeysManager:
             "created_at": datetime.now(timezone.utc),
             "created_by": created_by,
         }
-        await self._store.insert(row)
+        await self._require_store().insert(row)
 
         return ApiKeyResult(
             raw_key=raw_key,
@@ -159,8 +170,9 @@ class ApiKeysManager:
         Hits Postgres on every call (no cache). Raises ``ValueError`` on
         invalid, revoked, or expired keys.
         """
+        store = self._require_store()
         key_id = _parse_key(raw_key)
-        row = await self._store.get_by_key_id(key_id)
+        row = await store.get_by_key_id(key_id)
         if row is None:
             raise ValueError("Invalid API key")
 
@@ -193,6 +205,8 @@ class ApiKeysManager:
         return Scope(token)
 
     async def _touch(self, key_id: str) -> None:
+        if self._store is None:
+            return
         try:
             await self._store.update_last_used(key_id)
         except Exception:
@@ -201,7 +215,7 @@ class ApiKeysManager:
     async def revoke(self, key_id: str) -> bool:
         """Deactivate a key. Returns ``True`` if the key existed."""
         self._require_admin()
-        return await self._store.deactivate(key_id)
+        return await self._require_store().deactivate(key_id)
 
     async def rotate(
         self,
@@ -211,7 +225,7 @@ class ApiKeysManager:
     ) -> ApiKeyResult:
         """Create a replacement key with the same metadata, then revoke the old one."""
         self._require_admin()
-        old = await self._store.get_by_key_id(key_id)
+        old = await self._require_store().get_by_key_id(key_id)
         if old is None:
             raise ValueError(f"Key {key_id!r} not found")
 
@@ -225,12 +239,12 @@ class ApiKeysManager:
             expires_in_days=expires_in_days,
             created_by=old.get("created_by"),
         )
-        await self._store.deactivate(key_id)
+        await self._require_store().deactivate(key_id)
         return result
 
     async def list_keys(self, tenant_id: str) -> list[ApiKeyInfo]:
         self._require_admin()
-        rows = await self._store.list_keys(tenant_id)
+        rows = await self._require_store().list_keys(tenant_id)
         return [
             ApiKeyInfo(
                 key_id=r["key_id"],

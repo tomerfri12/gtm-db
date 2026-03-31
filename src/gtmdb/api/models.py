@@ -153,6 +153,28 @@ class Content(Entity):
     description: str | None = None
 
 
+@dataclass
+class Visitor(Entity):
+    """Anonymous or identified site visitor; link to campaigns via TOUCHED."""
+
+    visitor_id: str | None = None
+    source_channel: str | None = None
+    first_seen_at: str | None = None
+
+
+@dataclass
+class SubscriptionEvent(Entity):
+    """Signup, purchase, churn, or other subscription lifecycle event."""
+
+    event_type: str | None = None
+    occurred_at: str | None = None
+    plan_tier: str | None = None
+    plan_period: str | None = None
+    arr: float | None = None
+    days_from_signup: int | None = None
+    product_name: str | None = None
+
+
 # -- Communication events (Email, Call, Meeting, …) --------------------------
 
 

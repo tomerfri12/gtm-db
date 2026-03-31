@@ -26,6 +26,7 @@ from gtmdb.api.communication_events import EmailCampaignAPI, EmailsAPI
 from gtmdb.api.contacts import ContactsAPI
 from gtmdb.api.deals import DealsAPI
 from gtmdb.api.leads import LeadsAPI
+from gtmdb.api.visitors import VisitorsAPI
 from gtmdb.api.models import (
     Account,
     Actor,
@@ -39,8 +40,11 @@ from gtmdb.api.models import (
     Lead,
     Relationship,
     Score,
+    SubscriptionEvent,
+    Visitor,
 )
 from gtmdb.api.scores import ScoresAPI
+from gtmdb.api.subscription_events import SubscriptionEventsAPI
 from gtmdb.api.relationships import RelationshipsAPI
 
 __all__ = [
@@ -66,4 +70,8 @@ __all__ = [
     "RelationshipsAPI",
     "Score",
     "ScoresAPI",
+    "SubscriptionEvent",
+    "SubscriptionEventsAPI",
+    "Visitor",
+    "VisitorsAPI",
 ]

@@ -12,6 +12,8 @@ from gtmdb.api.models import (
     Entity,
     Lead,
     Relationship,
+    SubscriptionEvent,
+    Visitor,
 )
 from gtmdb.client import GtmDB
 from gtmdb.config import GtmdbSettings
@@ -41,6 +43,8 @@ __all__ = [
     "PRESETS",
     "Relationship",
     "Scope",
+    "SubscriptionEvent",
+    "Visitor",
     "create_token_from_presets",
     "seed_sample_graph",
 ]

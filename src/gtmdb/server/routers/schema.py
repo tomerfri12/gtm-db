@@ -19,6 +19,8 @@ from gtmdb.api.models import (
     Lead,
     Product,
     Score,
+    SubscriptionEvent,
+    Visitor,
 )
 
 router = APIRouter(tags=["schema"])
@@ -46,6 +48,8 @@ _ENTITY_CLASSES: list[tuple[str, type]] = [
     ("Channel", Channel),
     ("Product", Product),
     ("Content", Content),
+    ("Visitor", Visitor),
+    ("SubscriptionEvent", SubscriptionEvent),
 ]
 
 _RELATIONSHIPS: list[dict[str, Any]] = [
@@ -60,7 +64,10 @@ _RELATIONSHIPS: list[dict[str, Any]] = [
     {"type": "HAS_CAMPAIGN", "from": ["Channel"], "to": ["Campaign"]},
     {"type": "HAS_CONTENT", "from": ["Campaign"], "to": ["Content"]},
     {"type": "SIGNED_UP_FOR", "from": ["Lead"], "to": ["Product"]},
-    {"type": "FOR_PRODUCT", "from": ["Deal"], "to": ["Product"]},
+    {"type": "FOR_PRODUCT", "from": ["Deal", "SubscriptionEvent"], "to": ["Product"]},
+    {"type": "TOUCHED", "from": ["Visitor"], "to": ["Campaign"]},
+    {"type": "SIGNED_UP_AS", "from": ["Visitor"], "to": ["Account"]},
+    {"type": "HAS_SUBSCRIPTION_EVENT", "from": ["Account"], "to": ["SubscriptionEvent"]},
     {"type": "CREATED_BY", "from": ["Actor"], "to": ["*"]},
     {"type": "UPDATED_BY", "from": ["Actor"], "to": ["*"]},
 ]
