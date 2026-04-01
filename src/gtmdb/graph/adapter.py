@@ -444,6 +444,9 @@ class GraphAdapter:
         mode: str = "compact",
         read_transaction_timeout_s: float | None = None,
         max_discovered_nodes: int = 500,
+        traverse_include_labels_lower: list[str] | None = None,
+        traverse_exclude_labels_lower: list[str] | None = None,
+        traverse_filter_meta: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """BFS subgraph with per-label node cap (for API ``/explore``).
 
@@ -455,10 +458,23 @@ class GraphAdapter:
 
         ``max_discovered_nodes``: upper bound on distinct nodes loaded from Neo4j
         during BFS (before per-label capping).
+
+        ``traverse_include_labels_lower`` / ``traverse_exclude_labels_lower``:
+        restrict which neighbor labels BFS may step into (mutually exclusive
+        at the API layer). Center node is always included.
+
+        ``traverse_filter_meta``: echoed in the response as ``traverse_filter``
+        for agents (e.g. original label strings).
         """
         d = max(1, min(int(max_depth), 5))
         cap = max(1, min(int(nodes_per_type_cap), 50))
         md = max(20, min(int(max_discovered_nodes), 50_000))
+        inc_l = traverse_include_labels_lower or None
+        exc_l = traverse_exclude_labels_lower or None
+        if inc_l is not None and len(inc_l) == 0:
+            inc_l = None
+        if exc_l is not None and len(exc_l) == 0:
+            exc_l = None
 
         async def _explore_read_tx(
             tx: AsyncManagedTransaction,
@@ -466,13 +482,23 @@ class GraphAdapter:
             tid: str,
             depth: int,
             max_disc: int,
+            inc_lo: list[str] | None,
+            exc_lo: list[str] | None,
         ) -> dict[str, Any]:
             return await tr.cypher_explore_subgraph_bundle(
-                tx, cid, tid, depth, max_disc,
+                tx,
+                cid,
+                tid,
+                depth,
+                max_disc,
+                traverse_include_labels_lower=inc_lo,
+                traverse_exclude_labels_lower=exc_lo,
             )
 
         if read_transaction_timeout_s is not None and read_transaction_timeout_s > 0:
             _explore_read_tx.timeout = float(read_transaction_timeout_s)
+
+        traverse_filter = traverse_filter_meta
 
         async with self._driver.session() as session:
             bundle = await session.execute_read(
@@ -481,6 +507,8 @@ class GraphAdapter:
                 scope.tenant_id,
                 d,
                 md,
+                inc_l,
+                exc_l,
             )
         node_rows: list[dict[str, Any]] = bundle["node_rows"]
         discovery_truncated = bool(bundle.get("discovery_truncated"))
@@ -490,6 +518,7 @@ class GraphAdapter:
                 "edges": [],
                 "truncated": {},
                 "discovery_truncated": discovery_truncated,
+                "traverse_filter": traverse_filter,
             }
 
         label_by_id: dict[str, str] = {
@@ -559,6 +588,7 @@ class GraphAdapter:
                 "edges": edges_out,
                 "truncated": truncated,
                 "discovery_truncated": discovery_truncated,
+                "traverse_filter": traverse_filter,
             }
 
         # compact mode: IDs grouped by label, lightweight edges
@@ -577,6 +607,7 @@ class GraphAdapter:
             "edges": compact_edges,
             "truncated": truncated,
             "discovery_truncated": discovery_truncated,
+            "traverse_filter": traverse_filter,
         }
 
     async def execute(

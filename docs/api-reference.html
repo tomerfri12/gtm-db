@@ -518,7 +518,7 @@
           <tr><td><code class="method">GET</code></td><td><code>/health</code></td><td>Liveness</td></tr>
           <tr><td><code class="method">GET</code></td><td><code>/v1/search?q=…&amp;limit=</code></td><td>Cross-entity full-text search (lightweight hits)</td></tr>
           <tr><td><code class="method">GET</code></td><td><code>/v1/schema</code></td><td>Node types, fields, relationship shapes</td></tr>
-          <tr><td><code class="method">GET</code></td><td><code>/v1/entities/{id}/explore?depth=</code></td><td>Subgraph: <code>nodes</code>, <code>edges</code>, <code>truncated</code> (max 10 nodes per type)</td></tr>
+          <tr><td><code class="method">GET</code></td><td><code>/v1/entities/{id}/explore?depth=</code></td><td>Subgraph: <code>nodes</code>, <code>edges</code>, <code>truncated</code>, optional <code>include_labels</code> / <code>exclude_labels</code> (comma-separated; BFS traversal filter), <code>traverse_filter</code> echo, <code>discovery_truncated</code></td></tr>
           <tr><td><code class="method">POST</code></td><td><code>/v1/admin/keys</code></td><td>Create agent key (admin only)</td></tr>
           <tr><td><code class="method">GET</code></td><td><code>/v1/admin/keys</code></td><td>List keys (admin only)</td></tr>
           <tr><td><code class="method">DELETE</code></td><td><code>/v1/admin/keys/{key_id}</code></td><td>Revoke (admin only)</td></tr>

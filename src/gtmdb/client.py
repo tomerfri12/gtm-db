@@ -330,6 +330,9 @@ class GtmDB:
         mode: str = "compact",
         read_transaction_timeout_s: float | None = None,
         max_discovered_nodes: int = 500,
+        traverse_include_labels_lower: list[str] | None = None,
+        traverse_exclude_labels_lower: list[str] | None = None,
+        traverse_filter_meta: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Return nodes, edges, and truncation info for ``center_id`` within ``max_depth`` hops.
 
@@ -344,4 +347,7 @@ class GtmDB:
             mode=mode,
             read_transaction_timeout_s=read_transaction_timeout_s,
             max_discovered_nodes=max_discovered_nodes,
+            traverse_include_labels_lower=traverse_include_labels_lower,
+            traverse_exclude_labels_lower=traverse_exclude_labels_lower,
+            traverse_filter_meta=traverse_filter_meta,
         )

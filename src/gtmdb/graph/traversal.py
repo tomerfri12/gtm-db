@@ -306,12 +306,44 @@ def _map_row(m: Any) -> dict[str, Any]:
     return dict(m)
 
 
+def _cypher_explore_expand_query(
+    *,
+    filter_include_lower: list[str] | None,
+    filter_exclude_lower: list[str] | None,
+) -> str:
+    """BFS neighbor query; optional label filters on ``b`` (not the center)."""
+    inc = filter_include_lower or []
+    exc = filter_exclude_lower or []
+    where_label = ""
+    if inc:
+        where_label = (
+            "AND any(lbl IN labels(b) WHERE toLower(lbl) IN $inc_labels) "
+        )
+    elif exc:
+        where_label = (
+            "AND NOT any(lbl IN labels(b) WHERE toLower(lbl) IN $exc_labels) "
+        )
+    return (
+        "UNWIND $frontier AS eid "
+        "MATCH (a {id: eid, tenant_id: $tid})-[r]-(b {tenant_id: $tid}) "
+        "WHERE NOT b.id IN $seen "
+        f"{where_label}"
+        "WITH DISTINCT b "
+        "ORDER BY toString(b.id) "
+        "LIMIT $lim "
+        "RETURN b.id AS id, labels(b) AS labels, properties(b) AS props"
+    )
+
+
 async def cypher_explore_subgraph_bundle(
     tx: AsyncManagedTransaction,
     center_id: str,
     tenant_id: str,
     max_depth: int,
     max_discovered: int,
+    *,
+    traverse_include_labels_lower: list[str] | None = None,
+    traverse_exclude_labels_lower: list[str] | None = None,
 ) -> dict[str, Any]:
     """Nodes within ``max_depth`` hops + edges (BFS, no variable-length paths).
 
@@ -319,6 +351,10 @@ async def cypher_explore_subgraph_bundle(
     Implemented as frontier expansion to avoid path explosion from
     ``-[*0..d]-`` on hub nodes. At most ``max_discovered`` distinct nodes are
     collected (per-hop ``ORDER BY`` + ``LIMIT``); see ``discovery_truncated``.
+
+    Optional **traverse_*** filters restrict which neighbor nodes ``b`` may be
+    added when expanding the frontier (center is always kept). Use lowercase
+    lists for ``toLower`` matching in Cypher.
 
     Edges: same as before: directed rows with both endpoints in the node set
     and at least one endpoint with ``dist < max_depth``.
@@ -354,14 +390,9 @@ async def cypher_explore_subgraph_bundle(
     _ingest_row(rec0["id"], rec0["labels"], rec0["props"], 0)
 
     frontier: list[str] = [center_id]
-    q_expand = (
-        "UNWIND $frontier AS eid "
-        "MATCH (a {id: eid, tenant_id: $tid})-[r]-(b {tenant_id: $tid}) "
-        "WHERE NOT b.id IN $seen "
-        "WITH DISTINCT b "
-        "ORDER BY toString(b.id) "
-        "LIMIT $lim "
-        "RETURN b.id AS id, labels(b) AS labels, properties(b) AS props"
+    q_expand = _cypher_explore_expand_query(
+        filter_include_lower=traverse_include_labels_lower,
+        filter_exclude_lower=traverse_exclude_labels_lower,
     )
 
     for hop in range(1, d + 1):
@@ -372,9 +403,19 @@ async def cypher_explore_subgraph_bundle(
             discovery_truncated = True
             break
         seen = list(dist_by_id.keys())
-        result = await tx.run(
-            q_expand, frontier=frontier, seen=seen, tid=tenant_id, lim=int(remaining),
-        )
+        run_kw: dict[str, Any] = {
+            "frontier": frontier,
+            "seen": seen,
+            "tid": tenant_id,
+            "lim": int(remaining),
+        }
+        inc = traverse_include_labels_lower or []
+        exc = traverse_exclude_labels_lower or []
+        if inc:
+            run_kw["inc_labels"] = inc
+        if exc:
+            run_kw["exc_labels"] = exc
+        result = await tx.run(q_expand, **run_kw)
         next_frontier: list[str] = []
         async for row in result:
             bid = str(row["id"])

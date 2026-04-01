@@ -211,6 +211,15 @@ If `lead_ids` is non-empty, **`sourced_from_reasoning`** is required.
 GET {BASE}/v1/entities/{entity_id}/explore?depth=1|2&mode=compact|full
 ```
 
+Optional **traversal label filters** (comma-separated, case-insensitive; **not** both at once):
+
+- **`include_labels`** — BFS may **only add neighbors** whose Neo4j labels include at least one listed name (e.g. `include_labels=Visitor,Lead`). The **start node** is always kept. Use this when you want “from this campaign, only visitor-shaped hops,” without walking through huge `Channel` / `Product` hubs.
+- **`exclude_labels`** — Neighbors that have **any** listed label are **skipped** (e.g. `exclude_labels=Channel,Product,Content`).
+
+**Semantics:** This limits **which nodes become part of the walk**, not “hide types in the JSON only.” If a path to a target type goes only through excluded types, that target will **not** appear—use **`depth=1`** from an intermediate id, or relax the filter.
+
+The response echoes the active filter in **`traverse_filter`** (`mode` + `labels`) when set.
+
 - **`depth`**: how many relationship hops from the start node (server clamps to a max, often 1–5).
 - **`mode=compact`** (default): ids grouped by type + lightweight edges—best for **shape** and planning.
 - **`mode=full`**: returns full properties for nodes in the subgraph—**heavy**; see §7. Usually you should stay on **compact** and then **`GET /v1/{entity}/{id}`** for each neighbor you care about instead of using **`full`**.
@@ -313,6 +322,7 @@ You don’t need to know **how** the service persists the graph. Treat it as **a
 
 - The question needs **two hops** in one round trip (e.g. lead → campaign → channel, or contact → deal → account) **and** you want the API to walk it for you.
 - If you would otherwise chain **many** GETs just to “walk the graph,” prefer **`depth=2`** (within server limits).
+- If **`depth=2`** pulls in **too many** nodes of types you do not care about (e.g. **Channel**, **Product**), add **`include_labels=Visitor,...`** or **`exclude_labels=Channel,Product,...`** so BFS does not step through those hubs.
 
 ### When to use **`mode=compact` vs `mode=full`**
 
