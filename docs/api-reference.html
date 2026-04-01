@@ -525,6 +525,7 @@
           <tr><td><code class="method">POST</code></td><td><code>/v1/admin/keys/{key_id}/rotate</code></td><td>Rotate; body <code>{"expires_in_days": null}</code> optional</td></tr>
         </tbody>
       </table>
+      <p><strong>Explore responses beyond 200:</strong> <code>504</code> returns JSON with <code>error: explore_timeout</code>, <code>message</code>, and <code>suggestions</code> when the explore read hits <code>GTMDB_SERVER_EXPLORE_TRANSACTION_TIMEOUT_S</code> (optional; omit for Neo4j default). <code>503</code> with <code>error: explore_neo4j_error</code> for other database failures. If the client sees a proxy <code>502</code>, HTML error page, or hang with no JSON, the edge often timed out before GtmDB answered—retry with <code>depth=1</code>, <code>mode=compact</code>, or targeted <code>GET /v1/{type}/{id}</code>.</p>
       <h3>Entity CRUD (uniform)</h3>
       <p>Types: <code>leads</code>, <code>accounts</code>, <code>contacts</code>, <code>deals</code>, <code>campaigns</code>, <code>channels</code>, <code>products</code>, <code>content</code>, <code>visitors</code>, <code>subscription-events</code>, <code>product-accounts</code>, <code>emails</code>, <code>email-campaigns</code>.</p>
       <pre><code>POST   /v1/{type}              JSON body: domain fields + optional actor_id, reasoning

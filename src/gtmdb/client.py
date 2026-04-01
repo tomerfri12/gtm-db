@@ -328,6 +328,7 @@ class GtmDB:
         max_depth: int = 1,
         nodes_per_type_cap: int = 10,
         mode: str = "compact",
+        read_transaction_timeout_s: float | None = None,
     ) -> dict[str, Any]:
         """Return nodes, edges, and truncation info for ``center_id`` within ``max_depth`` hops.
 
@@ -340,4 +341,5 @@ class GtmDB:
             max_depth=max_depth,
             nodes_per_type_cap=nodes_per_type_cap,
             mode=mode,
+            read_transaction_timeout_s=read_transaction_timeout_s,
         )

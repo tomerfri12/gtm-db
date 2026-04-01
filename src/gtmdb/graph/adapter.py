@@ -12,6 +12,7 @@ import uuid
 from typing import Any
 
 import neo4j
+from neo4j import AsyncManagedTransaction
 
 from gtmdb.config import GtmdbSettings
 from gtmdb.graph import schema as _schema
@@ -441,18 +442,33 @@ class GraphAdapter:
         *,
         nodes_per_type_cap: int = 10,
         mode: str = "compact",
+        read_transaction_timeout_s: float | None = None,
     ) -> dict[str, Any]:
         """BFS subgraph with per-label node cap (for API ``/explore``).
 
         ``mode="compact"`` (default) returns node IDs grouped by label.
         ``mode="full"`` returns full node properties (heavier).
+
+        ``read_transaction_timeout_s``: passed to the Neo4j driver as the
+        managed read transaction timeout when set and positive.
         """
         d = max(1, min(int(max_depth), 5))
         cap = max(1, min(int(nodes_per_type_cap), 50))
 
+        async def _explore_read_tx(
+            tx: AsyncManagedTransaction,
+            cid: str,
+            tid: str,
+            depth: int,
+        ) -> dict[str, Any]:
+            return await tr.cypher_explore_subgraph_bundle(tx, cid, tid, depth)
+
+        if read_transaction_timeout_s is not None and read_transaction_timeout_s > 0:
+            _explore_read_tx.timeout = float(read_transaction_timeout_s)
+
         async with self._driver.session() as session:
             bundle = await session.execute_read(
-                tr.cypher_explore_subgraph_bundle,
+                _explore_read_tx,
                 center_id,
                 scope.tenant_id,
                 d,

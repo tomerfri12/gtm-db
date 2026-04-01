@@ -10,5 +10,10 @@ class ServerSettings(BaseSettings):
     explore_default_depth: int = Field(default=1, ge=1, le=5)
     explore_max_depth: int = Field(default=3, ge=1, le=5)
     explore_nodes_per_type: int = Field(default=10, ge=1, le=50)
+    # Neo4j read transaction timeout for /explore only (seconds). None = server default.
+    explore_transaction_timeout_s: float | None = Field(
+        default=None,
+        description="Max seconds for explore read transaction; 0 = unlimited (driver)",
+    )
 
     model_config = {"env_prefix": "GTMDB_SERVER_", "env_file": ".env", "extra": "ignore"}

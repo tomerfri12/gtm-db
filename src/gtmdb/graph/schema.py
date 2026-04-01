@@ -57,6 +57,21 @@ PRODUCT_ACCOUNT_CONSTRAINTS = [
     "FOR (n:ProductAccount) REQUIRE (n.tenant_id, n.external_id) IS UNIQUE",
 ]
 
+# Funnel import: MERGE keys for idempotent bulk loads. Drop duplicate legacy
+# nodes (same tenant + business key) before bootstrap if constraints fail.
+FUNNEL_IMPORT_CONSTRAINTS = [
+    "CREATE CONSTRAINT campaign_tenant_name IF NOT EXISTS "
+    "FOR (n:Campaign) REQUIRE (n.tenant_id, n.name) IS UNIQUE",
+    # Lead: no composite UNIQUE on external_id — API-created leads may omit it;
+    # funnel import MERGEs on (tenant_id, external_id) when present.
+    "CREATE CONSTRAINT visitor_tenant_visitor_id IF NOT EXISTS "
+    "FOR (n:Visitor) REQUIRE (n.tenant_id, n.visitor_id) IS UNIQUE",
+    "CREATE CONSTRAINT content_tenant_url IF NOT EXISTS "
+    "FOR (n:Content) REQUIRE (n.tenant_id, n.url) IS UNIQUE",
+    "CREATE CONSTRAINT subscriptionevent_tenant_import_key IF NOT EXISTS "
+    "FOR (e:SubscriptionEvent) REQUIRE (e.tenant_id, e.import_key) IS UNIQUE",
+]
+
 INDEXES = [
     f"CREATE INDEX IF NOT EXISTS FOR (n:{label}) ON (n.tenant_id)"
     for label in NODE_LABELS
@@ -67,7 +82,9 @@ LOOKUP_INDEXES = [
     "CREATE INDEX IF NOT EXISTS FOR (n:Account) ON (n.domain)",
     "CREATE INDEX IF NOT EXISTS FOR (n:Deal) ON (n.stage)",
     "CREATE INDEX IF NOT EXISTS FOR (n:Lead) ON (n.status)",
+    "CREATE INDEX IF NOT EXISTS FOR (n:Lead) ON (n.external_id)",
     "CREATE INDEX IF NOT EXISTS FOR (n:Campaign) ON (n.status)",
+    "CREATE INDEX IF NOT EXISTS FOR (n:Campaign) ON (n.name)",
     "CREATE INDEX IF NOT EXISTS FOR (n:EmailCampaign) ON (n.status)",
     "CREATE INDEX IF NOT EXISTS FOR (n:Channel) ON (n.name)",
     "CREATE INDEX IF NOT EXISTS FOR (n:Product) ON (n.name)",
@@ -75,6 +92,7 @@ LOOKUP_INDEXES = [
     "CREATE INDEX IF NOT EXISTS FOR (n:Content) ON (n.url)",
     "CREATE INDEX IF NOT EXISTS FOR (n:Visitor) ON (n.visitor_id)",
     "CREATE INDEX IF NOT EXISTS FOR (n:SubscriptionEvent) ON (n.event_type)",
+    "CREATE INDEX IF NOT EXISTS FOR (n:SubscriptionEvent) ON (n.import_key)",
     "CREATE INDEX IF NOT EXISTS FOR (n:AgentInteraction) ON (n.interaction_type)",
 ]
 
@@ -94,6 +112,7 @@ async def bootstrap(session: AsyncSession) -> None:
         CONSTRAINTS
         + ACTOR_CONSTRAINTS
         + PRODUCT_ACCOUNT_CONSTRAINTS
+        + FUNNEL_IMPORT_CONSTRAINTS
         + INDEXES
         + LOOKUP_INDEXES
         + FULLTEXT_INDEXES

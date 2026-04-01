@@ -309,44 +309,75 @@ def _map_row(m: Any) -> dict[str, Any]:
 async def cypher_explore_subgraph_bundle(
     tx: AsyncManagedTransaction, center_id: str, tenant_id: str, max_depth: int
 ) -> dict[str, Any]:
-    """Nodes within ``max_depth`` hops + edges BFS-equivalent in one transaction.
+    """Nodes within ``max_depth`` hops + edges (BFS, no variable-length paths).
 
-    Nodes: shortest undirected distance from center in ``[0, max_depth]``.
-    Edges: directed ``(a)-[r]->(b)`` with both endpoints in that set and
-    ``dist(a) < max_depth OR dist(b) < max_depth`` (same as expanding frontiers
-    at distances ``0 .. max_depth-1`` in the Python BFS).
+    Nodes: shortest undirected hop distance from center in ``[0, max_depth]``.
+    Implemented as frontier expansion to avoid path explosion from
+    ``-[*0..d]-`` on hub nodes.
+
+    Edges: same as before: directed rows with both endpoints in the node set
+    and at least one endpoint with ``dist < max_depth``.
     """
     d = max(1, min(int(max_depth), 5))
-    q1 = (
-        f"MATCH (center {{id: $id, tenant_id: $tid}}) "
-        f"MATCH p = (center)-[*0..{d}]-(n) "
-        "WHERE ALL(x IN nodes(p) WHERE x.tenant_id = $tid) "
-        "WITH n, min(length(p)) AS dist "
-        "RETURN collect(DISTINCT {id: n.id, labels: labels(n), "
-        "props: properties(n), dist: dist}) AS node_rows"
+    q0 = (
+        "MATCH (center {id: $id, tenant_id: $tid}) "
+        "RETURN center.id AS id, labels(center) AS labels, "
+        "properties(center) AS props"
     )
-    result = await tx.run(q1, id=center_id, tid=tenant_id)
-    rec = await result.single()
-    if not rec:
+    r0 = await tx.run(q0, id=center_id, tid=tenant_id)
+    rec0 = await r0.single()
+    if not rec0:
         return {"node_rows": [], "edges": []}
 
-    raw_nodes = rec["node_rows"]
-    if not raw_nodes:
-        return {"node_rows": [], "edges": []}
+    dist_by_id: dict[str, int] = {center_id: 0}
+    labels_by_id: dict[str, list[str]] = {}
+    props_by_id: dict[str, dict[str, Any]] = {}
+
+    def _ingest_row(
+        rid: Any, labels: Any, props: Any, dist: int,
+    ) -> None:
+        sid = str(rid)
+        dist_by_id[sid] = dist
+        lb = labels
+        if lb is not None and not isinstance(lb, list):
+            lb = list(lb)
+        labels_by_id[sid] = list(lb or [])
+        props_by_id[sid] = dict(props or {})
+
+    _ingest_row(rec0["id"], rec0["labels"], rec0["props"], 0)
+
+    frontier: list[str] = [center_id]
+    q_expand = (
+        "UNWIND $frontier AS eid "
+        "MATCH (a {id: eid, tenant_id: $tid})-[r]-(b {tenant_id: $tid}) "
+        "WHERE NOT b.id IN $seen "
+        "RETURN DISTINCT b.id AS id, labels(b) AS labels, properties(b) AS props"
+    )
+
+    for hop in range(1, d + 1):
+        if not frontier:
+            break
+        seen = list(dist_by_id.keys())
+        result = await tx.run(
+            q_expand, frontier=frontier, seen=seen, tid=tenant_id,
+        )
+        next_frontier: list[str] = []
+        async for row in result:
+            bid = str(row["id"])
+            if bid in dist_by_id:
+                continue
+            _ingest_row(row["id"], row["labels"], row["props"], hop)
+            next_frontier.append(bid)
+        frontier = next_frontier
 
     node_rows: list[dict[str, Any]] = []
-    for m in raw_nodes:
-        row = _map_row(m)
-        labels = row.get("labels")
-        if labels is not None and not isinstance(labels, list):
-            labels = list(labels)
-        props = row.get("props")
+    for nid, dist in dist_by_id.items():
         node_rows.append(
             {
-                "id": str(row["id"]),
-                "labels": list(labels or []),
-                "props": dict(props or {}),
-                "dist": int(row["dist"]),
+                "id": nid,
+                "labels": labels_by_id[nid],
+                "props": props_by_id[nid],
+                "dist": dist,
             }
         )
 

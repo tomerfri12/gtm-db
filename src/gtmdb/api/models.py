@@ -28,6 +28,8 @@ class Entity:
 
 @dataclass
 class Lead(Entity):
+    """external_id is the source lead id (e.g. Salesforce LEAD_ID) for MERGE imports."""
+    external_id: str | None = None
     first_name: str | None = None
     last_name: str | None = None
     name: str | None = None
@@ -42,6 +44,11 @@ class Lead(Entity):
     linkedin_url: str | None = None
     snippet: str | None = None
     outreach_email: str | None = None
+    lead_date: str | None = None
+    is_signup: bool | None = None
+    is_contact_sales: bool | None = None
+    signup_date: str | None = None
+    contact_sales_date: str | None = None
 
 
 @dataclass
@@ -101,6 +108,8 @@ class Campaign(Entity):
     name: str | None = None
     status: str | None = None
     channel: str | None = None
+    campaign_category: str | None = None
+    marketing_source: str | None = None
     budget: float | None = None
     start_date: str | None = None
     end_date: str | None = None
@@ -149,6 +158,28 @@ class ProductAccount(Entity):
     external_id: str | None = None
     name: str | None = None
     status: str | None = None
+    region: str | None = None
+    country: str | None = None
+    industry: str | None = None
+    company_size_group: str | None = None
+    company_size_num: str | None = None
+    is_paying: str | None = None
+    install_date: str | None = None
+    first_product_install_date: str | None = None
+    is_first_product: str | None = None
+    first_account_channel: str | None = None
+    is_cross_sell: str | None = None
+    first_plan_tier: str | None = None
+    first_plan_period: str | None = None
+    first_product_arr: str | None = None
+    first_product_arr_date: str | None = None
+    first_account_arr_date: str | None = None
+    first_churn_date: str | None = None
+    days_to_pay: str | None = None
+    survey_sector: str | None = None
+    survey_sub_sector: str | None = None
+    dep0_predicted_arr: str | None = None
+    extra_predicted: str | None = None
 
 
 @dataclass
@@ -169,12 +200,26 @@ class Visitor(Entity):
     visitor_id: str | None = None
     source_channel: str | None = None
     first_seen_at: str | None = None
+    visitor_row_type: str | None = None
+    device: str | None = None
+    first_user_platform_language: str | None = None
+    user_goal: str | None = None
+    signup_flow: str | None = None
+    raw_signup_flow: str | None = None
+    signup_use_case: str | None = None
+    signup_cluster: str | None = None
+    product_intent: str | None = None
+    seniority: str | None = None
+    department: str | None = None
+    job_role: str | None = None
+    team_size: str | None = None
 
 
 @dataclass
 class SubscriptionEvent(Entity):
     """Signup, purchase, churn, or other subscription lifecycle event."""
 
+    import_key: str | None = None
     event_type: str | None = None
     occurred_at: str | None = None
     plan_tier: str | None = None

@@ -73,8 +73,13 @@ _RELATIONSHIPS: list[dict[str, Any]] = [
     {"type": "SIGNED_UP_FOR", "from": ["Lead", "Visitor"], "to": ["Product"]},
     {"type": "FOR_PRODUCT", "from": ["Deal", "SubscriptionEvent", "ProductAccount"], "to": ["Product"]},
     {"type": "TOUCHED", "from": ["Visitor"], "to": ["Campaign"]},
+    {"type": "LANDED_ON", "from": ["Visitor"], "to": ["Content"]},
     {"type": "SIGNED_UP_AS", "from": ["Visitor", "Lead"], "to": ["Account", "ProductAccount"]},
-    {"type": "HAS_SUBSCRIPTION_EVENT", "from": ["Account", "ProductAccount"], "to": ["SubscriptionEvent"]},
+    {
+        "type": "HAS_SUBSCRIPTION_EVENT",
+        "from": ["Account", "ProductAccount", "Visitor", "Lead"],
+        "to": ["SubscriptionEvent"],
+    },
     {"type": "CREATED_BY", "from": ["Actor"], "to": ["*"]},
     {"type": "UPDATED_BY", "from": ["Actor"], "to": ["*"]},
 ]
