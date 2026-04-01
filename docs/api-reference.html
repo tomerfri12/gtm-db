@@ -490,7 +490,7 @@
       <h3>What this library includes</h3>
       <ul class="params" style="color: var(--text);">
         <li><strong><code>GtmDB</code></strong> — async entrypoint: <code>connect_gtmdb</code> / <code>close</code>, typed sub-APIs (<code>leads</code>, <code>accounts</code>, <code>contacts</code>, <code>deals</code>, <code>campaigns</code>, <code>channels</code>, <code>products</code>, <code>content</code>, <code>visitors</code>, <code>subscription_events</code>, <code>product_accounts</code>, <code>emails</code>, <code>email_campaigns</code>), <code>relationships</code>, low-level <code>NodeData</code>/<code>EdgeData</code>, and read helpers (<code>search</code>, <code>pipeline</code>, <code>entity_360</code>, <code>explore_subgraph</code>, …).</li>
-        <li><strong>Typed entity layer</strong> — dataclasses (<code>Lead</code>, <code>Account</code>, <code>Visitor</code>, <code>SubscriptionEvent</code>, <code>ProductAccount</code>, …) and CRUD with filtering, updates, and convenience methods (e.g. <code>contacts.assign_to_account</code>, <code>leads.link_campaign</code>, <code>campaigns.add_lead</code>).</li>
+        <li><strong>Typed entity layer</strong> — dataclasses (<code>Lead</code>, <code>Account</code>, <code>Visitor</code>, <code>SubscriptionEvent</code>, <code>ProductAccount</code>, …) and CRUD with filtering, updates, and convenience methods (e.g. <code>contacts.assign_to_account</code>, <code>leads.link_campaign</code>, <code>leads.sign_up_as</code>, <code>campaigns.add_lead</code>).</li>
         <li><strong><code>Scope</code></strong> — evaluates JSON <em>policies</em> for every operation: read/write on node labels and relationship types, optional per-record <code>ids</code> scoping, field-level <strong>masking</strong> (denylist / allowlist), and <strong>redaction</strong> when a row exists but must not be fully revealed.</li>
         <li><strong><code>AccessToken</code></strong> — SQLAlchemy model: <code>tenant_id</code>, <code>owner_id</code>, <code>owner_type</code>, <code>policies</code> (JSON string), <code>redact_mode</code>, <code>label</code>, <code>is_active</code>, timestamps.</li>
         <li><strong><code>create_token_from_presets</code> + <code>PRESETS</code></strong> — compose tokens from named policy bundles (<code>full_access</code>, <code>read_all</code>, <code>write_all</code>, <code>no_raw_content</code>) plus optional <code>custom_presets</code> and <code>extra_policies</code>.</li>
@@ -538,6 +538,7 @@ DELETE /v1/{type}/{id}</code></pre>
         <tbody>
           <tr><td><code class="method">POST</code></td><td><code>/v1/leads/{id}/scores</code></td><td><code>has_score_reasoning</code>, optional <code>reasoning</code>, score fields</td></tr>
           <tr><td><code class="method">POST</code></td><td><code>/v1/leads/{id}/link-campaign</code></td><td><code>campaign_id</code>, <code>reasoning</code></td></tr>
+          <tr><td><code class="method">POST</code></td><td><code>/v1/leads/{id}/sign-up-as</code></td><td>Exactly one of <code>product_account_id</code> or <code>account_id</code>, plus <code>reasoning</code> (<code>SIGNED_UP_AS</code>)</td></tr>
           <tr><td><code class="method">POST</code></td><td><code>/v1/contacts/{id}/assign-account</code></td><td><code>account_id</code>, <code>reasoning</code></td></tr>
           <tr><td><code class="method">POST</code></td><td><code>/v1/deals/{id}/assign-account</code></td><td><code>account_id</code>, <code>reasoning</code></td></tr>
           <tr><td><code class="method">POST</code></td><td><code>/v1/deals/{id}/add-contact</code></td><td><code>contact_id</code>, <code>reasoning</code></td></tr>
@@ -545,7 +546,7 @@ DELETE /v1/{type}/{id}</code></pre>
           <tr><td><code class="method">POST</code></td><td><code>/v1/email-campaigns/with-artifacts</code></td><td>Same semantics as <code>create_with_artifacts</code> (emails, lead_ids, …)</td></tr>
         </tbody>
       </table>
-      <p><strong>Note:</strong> Leads are not assigned to accounts via a dedicated lead endpoint — use contacts for <code>WORKS_AT</code> to accounts, or the generic <code>db.relationships.create</code> pattern in the Python library if you must link a lead to an account.</p>
+      <p><strong>Note:</strong> For a lead’s signup / product-workspace identity, use <code>POST /v1/leads/{id}/sign-up-as</code> (<code>SIGNED_UP_AS</code> to <code>Account</code> or <code>ProductAccount</code>). For company association via <code>WORKS_AT</code>, use <code>db.relationships.create</code> or mirror the contact pattern; contacts use the typed <code>assign-account</code> helper for <code>WORKS_AT</code>.</p>
       <h3>Explore response</h3>
       <p><code>truncated</code> lists labels where more than 10 nodes exist in the subgraph; use list endpoints with filters to page the rest.</p>
 
@@ -643,7 +644,7 @@ await db.close()</code></pre>
       <p><strong>Display <code>name</code> on nodes:</strong> Lead / Contact — composed person name with fallbacks to company / email;
         Email — subject or <code>Email step {n}</code>; Score — <code>{score_type}:{total}</code> from <code>add_score</code>; Deal, Account, Campaign — the <code>name</code> field you set.</p>
       <p><strong>Edge <code>reasoning</code> — required (non-empty) on:</strong>
-        <code>relationships.create</code>; <code>leads.link_campaign</code>;
+        <code>relationships.create</code>; <code>leads.link_campaign</code>; <code>leads.sign_up_as</code>;
         <code>contacts.assign_to_account</code>; <code>deals.assign_to_account</code>, <code>deals.add_contact</code>;
         <code>campaigns.add_lead</code>; <code>leads.add_score</code> (<code>has_score_reasoning</code> for <code>HAS_SCORE</code>);
         and <code>email_campaigns.create_with_artifacts</code> when <code>lead_ids</code> is non-empty (<code>sourced_from_reasoning</code>).
@@ -743,8 +744,9 @@ await db.contacts.delete(scope, person.id)</code></pre>
         A <strong>Lead</strong> is a <em>prospect</em> not yet fully qualified as a contact/opportunity:
         often from inbound forms, ads, or research. Fields mirror a lightweight person+company record
         plus <code>status</code> (e.g. <code>new</code>, <code>qualified</code>) and optional
-        <code>source</code> / <code>score</code>. To associate a lead with a company at the graph level,
-        use <code>db.relationships.create(..., "WORKS_AT", ...)</code> if needed; <strong>contacts</strong>
+        <code>source</code> / <code>score</code>. To tie a lead to a <strong>ProductAccount</strong> or company <strong>Account</strong> as signup identity, use
+        <code>sign_up_as</code> (<code>SIGNED_UP_AS</code>) or REST <code>POST /v1/leads/{id}/sign-up-as</code>.
+        For <code>WORKS_AT</code> to a company account, use <code>db.relationships.create</code>; <strong>contacts</strong>
         use the typed <code>assign_to_account</code> helper instead. Link a lead to a <strong>Campaign</strong> with
         <code>link_campaign</code> (<code>SOURCED_FROM</code> lead → campaign), or from the campaign side via REST
         <code>POST /v1/campaigns/{id}/add-lead</code> / <code>campaigns.add_lead</code>.
@@ -756,6 +758,7 @@ await db.contacts.delete(scope, person.id)</code></pre>
       </p>
       <p><strong>Extra methods:</strong>
         <code>link_campaign(..., *, reasoning)</code> — <code>SOURCED_FROM</code> lead → campaign;
+        <code>sign_up_as(..., target_id, *, reasoning)</code> — <code>SIGNED_UP_AS</code> lead → <code>Account</code> or <code>ProductAccount</code>;
         <code>add_score(..., *, actor_id, has_score_reasoning, reasoning=None, **score_fields)</code> — creates <code>Score</code> + <code>HAS_SCORE</code>;
         <code>scores_for</code> — list scores for a lead.
       </p>
@@ -771,6 +774,13 @@ prospect = await db.leads.create(
     source="webinar",
     score=42.0,
 )
+pa = await db.product_accounts.create(
+    scope, actor_id=ACTOR, external_id="pulse-acct-1", name="Workspace 1"
+)
+await db.leads.sign_up_as(
+    scope, prospect.id, pa.id, reasoning="Trial signup tied to product workspace"
+)
+acc = await db.accounts.create(scope, actor_id=ACTOR, name="Beta Corp")
 await db.relationships.create(
     scope, prospect.id, "WORKS_AT", acc.id, reasoning="Clear firmographic match"
 )
@@ -898,7 +908,8 @@ await db.relationships.create(
         store an upstream identifier in <code>visitor_id</code>, optional <code>source_channel</code>, and
         <code>first_seen_at</code>. Link to <strong>Campaign</strong> with a <code>TOUCHED</code> edge and to
         <strong>Account</strong> or <strong>ProductAccount</strong> with <code>SIGNED_UP_AS</code> when modeling signup attribution (use
-        <code>db.relationships.create</code> with required <code>reasoning</code>).
+        <code>db.relationships.create</code> with required <code>reasoning</code>). For <strong>Lead</strong> records, prefer
+        <code>db.leads.sign_up_as</code> or <code>POST /v1/leads/{id}/sign-up-as</code>.
       </p>
       <p><strong>Python type:</strong> <code>from gtmdb import Visitor</code> —
         <code>visitor_id</code>, <code>source_channel</code>, <code>first_seen_at</code>.
@@ -1143,7 +1154,7 @@ rels = await db.relationships.list(scope, node_id, rel_type="WORKS_AT", directio
 await db.relationships.delete(scope, lead_id, "WORKS_AT", account_id)</code></pre>
       <p><strong>Attribution &amp; lifecycle (v1 schema):</strong> in addition to edges above, the introspection schema includes
         <code>ProductAccount</code> with <code>BELONGS_TO</code> → <strong>Account</strong> and <code>FOR_PRODUCT</code> → <strong>Product</strong>;
-        <code>TOUCHED</code> (Visitor → Campaign); <code>SIGNED_UP_AS</code> (Visitor → Account or ProductAccount);
+        <code>TOUCHED</code> (Visitor → Campaign); <code>SIGNED_UP_AS</code> (Visitor or Lead → Account or ProductAccount);
         <code>HAS_SUBSCRIPTION_EVENT</code> (Account or ProductAccount → SubscriptionEvent); and <code>FOR_PRODUCT</code> from
         <strong>Deal</strong>, <strong>SubscriptionEvent</strong>, or <strong>ProductAccount</strong> to <strong>Product</strong>. See <code>GET /v1/schema</code>.</p>
 

@@ -50,6 +50,13 @@ ACTOR_CONSTRAINTS = [
     "FOR (n:Actor) REQUIRE (n.tenant_id, n.id) IS UNIQUE",
 ]
 
+# Import MERGE uses (tenant_id, external_id). If duplicates already exist
+# (e.g. repeated CREATE before MERGE), drop or merge extras before bootstrap.
+PRODUCT_ACCOUNT_CONSTRAINTS = [
+    "CREATE CONSTRAINT productaccount_tenant_external IF NOT EXISTS "
+    "FOR (n:ProductAccount) REQUIRE (n.tenant_id, n.external_id) IS UNIQUE",
+]
+
 INDEXES = [
     f"CREATE INDEX IF NOT EXISTS FOR (n:{label}) ON (n.tenant_id)"
     for label in NODE_LABELS
@@ -86,6 +93,7 @@ async def bootstrap(session: AsyncSession) -> None:
     stmts = (
         CONSTRAINTS
         + ACTOR_CONSTRAINTS
+        + PRODUCT_ACCOUNT_CONSTRAINTS
         + INDEXES
         + LOOKUP_INDEXES
         + FULLTEXT_INDEXES

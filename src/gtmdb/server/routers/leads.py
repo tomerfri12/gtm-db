@@ -71,3 +71,32 @@ async def link_lead_campaign(
     except PermissionError as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
     return {"status": "linked"}
+
+
+@router.post("/{lead_id}/sign-up-as")
+async def lead_sign_up_as(
+    lead_id: str,
+    db: Annotated[GtmDB, Depends(get_db)],
+    scope: Annotated[Scope, Depends(get_scope)],
+    body: dict[str, Any] = Body(...),
+) -> dict[str, str]:
+    """Link lead to company Account or ProductAccount via ``SIGNED_UP_AS``."""
+    pa = (body.get("product_account_id") or "").strip()
+    acc = (body.get("account_id") or "").strip()
+    reasoning = (body.get("reasoning") or "").strip()
+    if not reasoning:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="reasoning is required",
+        )
+    if bool(pa) == bool(acc):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="Exactly one of product_account_id or account_id is required",
+        )
+    target = pa or acc
+    try:
+        await db.leads.sign_up_as(scope, lead_id, target, reasoning=reasoning)
+    except PermissionError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
+    return {"status": "linked"}

@@ -16,7 +16,9 @@ class RelationshipsAPI:
 
     Use this for arbitrary edge types. For common CRM relationships,
     prefer typed helpers (e.g. ``contacts.assign_to_account``,
-    ``deals.assign_to_account``, ``leads.link_campaign``) when available.
+    ``deals.assign_to_account``, ``leads.link_campaign``,
+    ``leads.sign_up_as`` for **Lead** ``SIGNED_UP_AS`` → **Account** or
+    **ProductAccount**) when available.
     For a **lead → account** ``WORKS_AT`` link, use :meth:`create` here
     (only contacts have ``assign_to_account`` on the Contact API).
     """

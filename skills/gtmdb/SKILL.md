@@ -177,6 +177,7 @@ These create graph edges. **`reasoning` is required** on the link payloads (non-
 | Action | Method + path (conceptually) |
 |--------|------------------------------|
 | Lead → campaign | `POST /v1/leads/{lead_id}/link-campaign` body: `campaign_id`, `reasoning` |
+| Lead → Account or ProductAccount (signup) | `POST /v1/leads/{lead_id}/sign-up-as` body: exactly one of `account_id` or `product_account_id`, plus `reasoning` (`SIGNED_UP_AS`) |
 | Campaign → lead | `POST /v1/campaigns/{campaign_id}/add-lead` body: `lead_id`, `reasoning` |
 | Contact → account | `POST /v1/contacts/{contact_id}/assign-account` body: `account_id`, `reasoning` |
 | Deal → account | `POST /v1/deals/{deal_id}/assign-account` body: `account_id`, `reasoning` |
@@ -184,7 +185,7 @@ These create graph edges. **`reasoning` is required** on the link payloads (non-
 
 **Visitor, subscription events, and attribution edges**
 
-There are no dedicated REST “link” routes for **TOUCHED**, **SIGNED_UP_AS**, **HAS_SUBSCRIPTION_EVENT**, **BELONGS_TO** (product account → company), or **FOR_PRODUCT** (product account → product line) yet. Use the Python SDK **`db.relationships.create(..., reasoning="…")`** with the relationship types listed in §5, subject to your key’s policies.
+There are no dedicated REST “link” routes for **TOUCHED**, **HAS_SUBSCRIPTION_EVENT**, **BELONGS_TO** (product account → company), or **FOR_PRODUCT** (product account → product line) yet—except **Lead** **`SIGNED_UP_AS`** via **`POST /v1/leads/{id}/sign-up-as`**. For **Visitor** **`SIGNED_UP_AS`** and other edges, use **`db.relationships.create(..., reasoning="…")`** with the relationship types listed in §5, subject to your key’s policies.
 
 **Scores (only via leads)**
 
@@ -224,7 +225,7 @@ Responses include `truncated` when caps apply—read it and compensate (narrow q
 |--------|----------------|
 | **Account** | A company or organization you sell to. |
 | **ProductAccount** | The customer’s **account inside one product** (e.g. their id in your CRM app)—different from the company **Account**. Use **`external_id`** for that product-system id; link **`BELONGS_TO`** → company **Account** and **`FOR_PRODUCT`** → **Product**. |
-| **Lead** | A prospect record (often early stage): form fill, list import, trial signup. |
+| **Lead** | A prospect record (often early stage): form fill, list import, trial signup. Can link to a **ProductAccount** or company **Account** via **`SIGNED_UP_AS`** (product workspace / signup identity), or **`WORKS_AT`** for firmographic company association. |
 | **Contact** | A person record—often tied to an account when they’re a known stakeholder. |
 | **Deal** | A revenue opportunity (amount, stage, dates, etc.). |
 | **Campaign** | A marketing initiative; leads can be **sourced from** campaigns. |
@@ -247,7 +248,8 @@ Think in **nodes** and **labeled relationships**. Names below match what you’l
 **Common paths**
 
 - **Lead —SOURCED_FROM→ Campaign** (or email campaign path, depending on data)
-- **Lead —WORKS_AT→ Account** (person at company)
+- **Lead —WORKS_AT→ Account** or **ProductAccount** (person at company; optional product-workspace reading)
+- **Lead —SIGNED_UP_AS→ Account** or **ProductAccount** (signup / product workspace identity—same pattern as **Visitor**)
 - **Contact —WORKS_AT→ Account**
 - **Deal —BELONGS_TO→ Account**
 - **ProductAccount —BELONGS_TO→ Account** (workspace belongs to the company)

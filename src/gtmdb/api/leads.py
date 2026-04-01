@@ -72,6 +72,25 @@ class LeadsAPI(EntityAPI[Lead]):
             scope, EdgeData("SOURCED_FROM", lead_id, campaign_id, reasoning=rs),
         )
 
+    async def sign_up_as(
+        self,
+        scope: Scope,
+        lead_id: str,
+        target_id: str,
+        *,
+        reasoning: str,
+    ) -> None:
+        """Create ``SIGNED_UP_AS`` from this lead to an ``Account`` or ``ProductAccount``.
+
+        Use a **ProductAccount** id when the workspace identity is the product-system
+        account (e.g. pulse / external id stored on that node as ``external_id``).
+        """
+        rs = require_non_empty_str(reasoning, "reasoning")
+        tid = require_non_empty_str(target_id, "target_id")
+        await self._graph.create_edge(
+            scope, EdgeData("SIGNED_UP_AS", lead_id, tid, reasoning=rs),
+        )
+
     async def add_score(
         self,
         scope: Scope,
