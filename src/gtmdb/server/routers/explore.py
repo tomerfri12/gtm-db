@@ -36,6 +36,7 @@ async def explore_entity(
             nodes_per_type_cap=srv.explore_nodes_per_type,
             mode=mode,
             read_transaction_timeout_s=srv.explore_transaction_timeout_s,
+            max_discovered_nodes=srv.explore_max_discovered_nodes,
         )
     except PermissionError as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e

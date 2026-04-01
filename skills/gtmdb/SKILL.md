@@ -215,7 +215,7 @@ GET {BASE}/v1/entities/{entity_id}/explore?depth=1|2&mode=compact|full
 - **`mode=compact`** (default): ids grouped by type + lightweight edges—best for **shape** and planning.
 - **`mode=full`**: returns full properties for nodes in the subgraph—**heavy**; see §7. Usually you should stay on **compact** and then **`GET /v1/{entity}/{id}`** for each neighbor you care about instead of using **`full`**.
 
-Responses include `truncated` when caps apply—read it and compensate (narrow query, fetch specific ids, or another hop).
+Responses include `truncated` when caps apply—read it and compensate (narrow query, fetch specific ids, or another hop). If **`discovery_truncated`** is true, the server hit a **hard cap on how many nodes** it loads for BFS (hub protection); the subgraph may be incomplete—raise **`GTMDB_SERVER_EXPLORE_MAX_DISCOVERED_NODES`** only if you truly need more, or drill in with **`depth=1`** / targeted **`GET`**.
 
 **Errors and “no response”**
 
@@ -223,7 +223,7 @@ Responses include `truncated` when caps apply—read it and compensate (narrow q
 - **`503`** with `error: explore_neo4j_error`: transient or database-side failure—retry with backoff; if it persists, check Neo4j and deployment health.
 - **Connection errors / HTML “Application failed to respond” / `502`**: usually the **edge proxy** (e.g. Railway) timed out before the app answered—**GtmDB does not control that body**. Retry with **lower `depth`**, avoid **`mode=full`** on hubs, use **`GET`** by id; confirm the service and database are up.
 
-Optional server env: **`GTMDB_SERVER_EXPLORE_TRANSACTION_TIMEOUT_S`** (seconds) caps how long explore’s read transaction may run; omit for Neo4j server default.
+Server env: **`GTMDB_SERVER_EXPLORE_TRANSACTION_TIMEOUT_S`** defaults to **55** seconds for explore’s Neo4j read transaction (set **`0`** to disable the client-side cap). **`GTMDB_SERVER_EXPLORE_MAX_DISCOVERED_NODES`** (default **500**) bounds BFS size on hub nodes.
 
 ---
 

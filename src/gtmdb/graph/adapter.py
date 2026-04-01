@@ -443,6 +443,7 @@ class GraphAdapter:
         nodes_per_type_cap: int = 10,
         mode: str = "compact",
         read_transaction_timeout_s: float | None = None,
+        max_discovered_nodes: int = 500,
     ) -> dict[str, Any]:
         """BFS subgraph with per-label node cap (for API ``/explore``).
 
@@ -451,17 +452,24 @@ class GraphAdapter:
 
         ``read_transaction_timeout_s``: passed to the Neo4j driver as the
         managed read transaction timeout when set and positive.
+
+        ``max_discovered_nodes``: upper bound on distinct nodes loaded from Neo4j
+        during BFS (before per-label capping).
         """
         d = max(1, min(int(max_depth), 5))
         cap = max(1, min(int(nodes_per_type_cap), 50))
+        md = max(20, min(int(max_discovered_nodes), 50_000))
 
         async def _explore_read_tx(
             tx: AsyncManagedTransaction,
             cid: str,
             tid: str,
             depth: int,
+            max_disc: int,
         ) -> dict[str, Any]:
-            return await tr.cypher_explore_subgraph_bundle(tx, cid, tid, depth)
+            return await tr.cypher_explore_subgraph_bundle(
+                tx, cid, tid, depth, max_disc,
+            )
 
         if read_transaction_timeout_s is not None and read_transaction_timeout_s > 0:
             _explore_read_tx.timeout = float(read_transaction_timeout_s)
@@ -472,10 +480,17 @@ class GraphAdapter:
                 center_id,
                 scope.tenant_id,
                 d,
+                md,
             )
         node_rows: list[dict[str, Any]] = bundle["node_rows"]
+        discovery_truncated = bool(bundle.get("discovery_truncated"))
         if not node_rows:
-            return {"nodes": {}, "edges": [], "truncated": {}}
+            return {
+                "nodes": {},
+                "edges": [],
+                "truncated": {},
+                "discovery_truncated": discovery_truncated,
+            }
 
         label_by_id: dict[str, str] = {
             nr["id"]: (nr["labels"][0] if nr["labels"] else "Unknown")
@@ -543,6 +558,7 @@ class GraphAdapter:
                 "nodes": nodes_out,
                 "edges": edges_out,
                 "truncated": truncated,
+                "discovery_truncated": discovery_truncated,
             }
 
         # compact mode: IDs grouped by label, lightweight edges
@@ -560,6 +576,7 @@ class GraphAdapter:
             "nodes": compact_nodes,
             "edges": compact_edges,
             "truncated": truncated,
+            "discovery_truncated": discovery_truncated,
         }
 
     async def execute(
