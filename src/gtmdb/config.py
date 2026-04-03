@@ -32,6 +32,18 @@ class GtmdbSettings(BaseSettings):
     # Shared admin key (``GTMDB_ADMIN_KEY``). Checked locally in ``connect_gtmdb``.
     admin_key: str | None = None
 
+    # ClickHouse (OLAP analytics store)
+    clickhouse_host: str = Field(default="localhost", description="ClickHouse server host")
+    clickhouse_port: int = Field(default=8123, description="ClickHouse HTTP port")
+    clickhouse_user: str = Field(default="dev", description="ClickHouse user")
+    clickhouse_password: str = Field(default="", description="ClickHouse password")
+    clickhouse_database: str = Field(default="gtmdb", description="ClickHouse database name")
+
+    # LLM (planner agent)
+    openai_api_key: str = Field(default="", description="OpenAI API key for planner agent")
+    planner_model: str = Field(default="gpt-4o-mini", description="Fast model for simple/single-engine queries")
+    planner_model_complex: str = Field(default="gpt-4o", description="Capable model for multi-engine queries")
+
     model_config = {"env_prefix": "GTMDB_", "env_file": ".env", "extra": "ignore"}
 
     @field_validator("key_store_url", mode="before")

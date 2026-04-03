@@ -1,20 +1,29 @@
 services:
-  neo4j:
-    image: neo4j:5-community
+  # Note: Neo4j runs on Neo4j Aura (cloud) -- see GTMDB_NEO4J_URI in .env
+  # No local Neo4j service needed.
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.3
     restart: unless-stopped
-    environment:
-      NEO4J_AUTH: neo4j/crmdb_password
-      NEO4J_PLUGINS: '["apoc"]'
     ports:
-      - "7474:7474"
-      - "7687:7687"
+      - "8123:8123"
+      - "9000:9000"
     volumes:
-      - neo4jdata:/data
+      - clickhouse-data:/var/lib/clickhouse
+    environment:
+      CLICKHOUSE_DB: gtmdb
+      CLICKHOUSE_USER: dev
+      CLICKHOUSE_PASSWORD: devpassword
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
     healthcheck:
-      test: ["CMD", "neo4j", "status"]
-      interval: 10s
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
 volumes:
-  neo4jdata:
+  clickhouse-data:

@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>gtmDB Agent Query Layer Design - Full Plan</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #1e88e5;
+            --secondary: #43a047;
+            --accent: #fb8c00;
+            --warning: #e53935;
+            --dark: #121212;
+            --darker: #0a0a0a;
+            --light: #f5f5f5;
+            --text: #e0e0e0;
+            --text-muted: #9e9e9e;
+            --border: #303030;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, var(--dark) 0%, var(--darker) 100%);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 0 20px;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.2em;
+            margin-bottom: 30px;
+        }
+
+        nav {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .nav-btn {
+            padding: 10px 20px;
+            background: var(--border);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .nav-btn:hover, .nav-btn.active {
+            background: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        section {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            font-size: 2.2em;
+            margin-bottom: 30px;
+            color: var(--primary);
+            border-bottom: 2px solid var(--secondary);
+            padding-bottom: 15px;
+        }
+
+        h3 {
+            font-size: 1.5em;
+            margin: 25px 0 15px;
+            color: var(--secondary);
+        }
+
+        h4 {
+            font-size: 1.1em;
+            margin: 15px 0 10px;
+            color: var(--accent);
+        }
+
+        .card {
+            background: var(--border);
+            border-left: 4px solid var(--primary);
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            background: rgba(30, 136, 229, 0.1);
+            transform: translateX(5px);
+        }
+
+        .card.secondary {
+            border-left-color: var(--secondary);
+        }
+
+        .card.accent {
+            border-left-color: var(--accent);
+        }
+
+        .card.warning {
+            border-left-color: var(--warning);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .grid-item {
+            background: var(--border);
+            padding: 20px;
+            border-radius: 4px;
+            border: 1px solid var(--primary);
+        }
+
+        code {
+            background: var(--darker);
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: var(--accent);
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        pre {
+            background: var(--darker);
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 15px 0;
+            border-left: 4px solid var(--primary);
+        }
+
+        pre code {
+            color: var(--light);
+            padding: 0;
+        }
+
+        .highlight {
+            background: rgba(251, 140, 0, 0.2);
+            padding: 15px;
+            border-left: 4px solid var(--accent);
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--border);
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: rgba(30, 136, 229, 0.05);
+        }
+
+        ul, ol {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        li {
+            margin: 8px 0;
+        }
+
+        .phase-timeline {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+
+        .phase-badge {
+            background: var(--primary);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .phase-badge.phase0 { background: #673ab7; }
+        .phase-badge.phase1 { background: var(--primary); }
+        .phase-badge.phase2 { background: var(--secondary); }
+        .phase-badge.phase3 { background: var(--accent); }
+        .phase-badge.phase4 { background: #00bcd4; }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat {
+            background: var(--border);
+            padding: 20px;
+            border-radius: 4px;
+            text-align: center;
+            border-top: 3px solid var(--primary);
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .comparison-item {
+            background: var(--border);
+            padding: 20px;
+            border-radius: 4px;
+        }
+
+        .comparison-item.before {
+            border-left: 4px solid var(--warning);
+        }
+
+        .comparison-item.after {
+            border-left: 4px solid var(--secondary);
+        }
+
+        .layer {
+            background: var(--border);
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid var(--primary);
+            border-radius: 4px;
+        }
+
+        .layer h4 {
+            margin-top: 0;
+        }
+
+        .layer.layer1 { border-left-color: #ff9800; }
+        .layer.layer2 { border-left-color: var(--primary); }
+        .layer.layer3 { border-left-color: var(--secondary); }
+
+        .footer {
+            text-align: center;
+            padding: 30px 0;
+            border-top: 2px solid var(--border);
+            margin-top: 50px;
+            color: var(--text-muted);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: var(--primary);
+            color: white;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .badge.secondary { background: var(--secondary); }
+        .badge.accent { background: var(--accent); }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2em; }
+            h2 { font-size: 1.5em; }
+            .comparison { grid-template-columns: 1fr; }
+            nav { flex-direction: column; }
+            .nav-btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>gtmDB Query Agent</h1>
+            <p class="subtitle">Complete Implementation Plan & Architecture</p>
+            <nav>
+                <button class="nav-btn active" onclick="showSection('overview')">Overview</button>
+                <button class="nav-btn" onclick="showSection('decisions')">Key Decisions</button>
+                <button class="nav-btn" onclick="showSection('phases')">Phases</button>
+                <button class="nav-btn" onclick="showSection('security')">Security</button>
+                <button class="nav-btn" onclick="showSection('tech')">Tech Stack</button>
+                <button class="nav-btn" onclick="showSection('timeline')">Timeline</button>
+                <button class="nav-btn" onclick="showSection('details')">Details</button>
+            </nav>
+        </header>
+
+        <!-- OVERVIEW -->
+        <section id="overview" class="active">
+            <h2>Overview & Vision</h2>
+            
+            <div class="card">
+                <h3>The Problem</h3>
+                <p>External agents (Marketing, Sales) need to answer complex analytical questions like:</p>
+                <ul>
+                    <li>"What are my best-performing campaigns by LTV?"</li>
+                    <li>"What's the conversion rate by channel?"</li>
+                    <li>"Show me all touches on this deal, with their ROI impact"</li>
+                </ul>
+                <p style="margin-top: 15px;"><strong>Current approach:</strong> Rigid, pre-built endpoints for each metric. Doesn't scale. Can't handle new questions without API changes.</p>
+            </div>
+
+            <div class="card secondary">
+                <h3>The Solution</h3>
+                <p>An internal <strong>LangGraph-based AI agent</strong> that:</p>
+                <ul>
+                    <li>Receives intent-based natural language questions</li>
+                    <li>Generates Cypher (Neo4j) and SQL (ClickHouse) queries on the fly</li>
+                    <li>Combines graph traversal with OLAP analytics</li>
+                    <li>Operates safely within permission boundaries (3-layer guard)</li>
+                    <li>Self-heals on errors and retries with corrected queries</li>
+                </ul>
+            </div>
+
+            <h3>Architecture Layers</h3>
+            <div style="margin: 20px 0;">
+                <div class="layer layer1">
+                    <h4>Layer 1: Soft Guidance</h4>
+                    <p>Agent's system prompt tells it what the caller can access. Agent self-limits.</p>
+                </div>
+                <div class="layer layer2">
+                    <h4>Layer 2: Query Guard</h4>
+                    <p>Parses generated Cypher/SQL, validates against permission set, rejects violations before execution.</p>
+                </div>
+                <div class="layer layer3">
+                    <h4>Layer 3: DB-Level</h4>
+                    <p>Read-only users, row policies. Physically impossible to bypass, even if Layers 1+2 fail.</p>
+                </div>
+            </div>
+
+            <h3>Key Metrics</h3>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">3</div>
+                    <div class="stat-label">Agent Tools</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">4</div>
+                    <div class="stat-label">Implementation Phases</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">65</div>
+                    <div class="stat-label">ClickHouse Columns</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">3</div>
+                    <div class="stat-label">Permission Layers</div>
+                </div>
+            </div>
+
+            <h3>Tech Stack</h3>
+            <table>
+                <tr>
+                    <th>Component</th>
+                    <th>Technology</th>
+                    <th>Dev</th>
+                    <th>Production</th>
+                </tr>
+                <tr>
+                    <td>Graph DB</td>
+                    <td>Neo4j</td>
+                    <td>Docker</td>
+                    <td>Managed</td>
+                </tr>
+                <tr>
+                    <td>OLAP Store</td>
+                    <td>ClickHouse</td>
+                    <td>Docker</td>
+                    <td>Railway/ClickHouse Cloud</td>
+                </tr>
+                <tr>
+                    <td>Agent Framework</td>
+                    <td>LangGraph + OpenAI</td>
+                    <td>Local</td>
+                    <td>Cloud</td>
+                </tr>
+                <tr>
+                    <td>Query Validation</td>
+                    <td>sqlglot</td>
+                    <td>Python lib</td>
+                    <td>Python lib</td>
+                </tr>
+            </table>
+        </section>
+
+        <!-- KEY DECISIONS -->
+        <section id="decisions">
+            <h2>Core Architectural Decisions</h2>
+
+            <h3>1. ClickHouse for Analytics (Not Neo4j Aggregation)</h3>
+            <div class="card accent">
+                <h4>Decision</h4>
+                <p>Use ClickHouse as a dedicated OLAP store for metrics, not Neo4j aggregations.</p>
+                <h4>Why</h4>
+                <ul>
+                    <li><strong>Neo4j limitation:</strong> Large aggregations (>1M intermediate rows) hit the EagerAggregation bottleneck. Graph DBs are optimized for traversal, not aggregation.</li>
+                    <li><strong>ClickHouse advantage:</strong> Columnar architecture, naturally suited for GROUP BY/SUM/COUNT operations</li>
+                    <li><strong>Flexibility:</strong> Query any column independently without pre-planned indexes</li>
+                    <li><strong>Durability:</strong> Enterprise-grade, replicated, no data loss</li>
+                </ul>
+                <h4>Tradeoff</h4>
+                <p>Need to maintain dual-write (Neo4j → ClickHouse sync) and migrate existing data. Initially direct inserts; later Kafka for async streaming.</p>
+            </div>
+
+            <h3>2. Text2Cypher/Text2SQL Instead of Pre-Built Toolkit</h3>
+            <div class="card secondary">
+                <h4>Decision</h4>
+                <p>Agent generates raw Cypher and SQL directly, not pre-built operation tools.</p>
+                <h4>Before (Rigid)</h4>
+                <ul>
+                    <li>~10 pre-built tools: graph_explore, olap_aggregate, olap_funnel, etc.</li>
+                    <li>Each tool = fixed parameters, limits flexibility</li>
+                    <li>Adding new tool = new code</li>
+                    <li>Defeats the purpose of having an agent (we wanted to escape rigidity!)</li>
+                </ul>
+                <h4>After (Flexible)</h4>
+                <ul>
+                    <li>3 tools: execute_cypher, execute_sql, get_schema</li>
+                    <li>Agent can query any column, any relationship, any aggregation</li>
+                    <li>Adding new data = no code changes</li>
+                    <li>Fewer lines of code, more powerful system</li>
+                </ul>
+                <h4>Guardrail</h4>
+                <p>The query guard (Phase 2) validates every generated query before execution. This is the safety mechanism.</p>
+            </div>
+
+            <h3>3. Three-Layer Permission Guard (Not Tool-Based)</h3>
+            <div class="card warning">
+                <h4>Decision</h4>
+                <p>Permissions are enforced at three levels: agent awareness, query validation, and DB constraints. Agent never controls API keys or resource access.</p>
+                <h4>Layer 1: Agent Awareness (Soft)</h4>
+                <p>System prompt tells agent what it can access. Agent tries to comply voluntarily. Can fail—it's an LLM.</p>
+                <h4>Layer 2: Query Guard (Medium)</h4>
+                <p>Before execution: parse SQL/Cypher, validate columns/labels against permission set, reject violations. Uses sqlglot AST parsing for SQL.</p>
+                <h4>Layer 3: DB-Level (Hard)</h4>
+                <p>Read-only users, row policies, column grants. Physically impossible to bypass.</p>
+                <h4>Why Not Tool-Based?</h4>
+                <p>Tool-based permission checks scale poorly. A query guard that validates any query is simpler and more flexible. Permissions are modeled as data, not baked into tool definitions.</p>
+            </div>
+
+            <h3>4. Single-Write Dual-Read Pattern</h3>
+            <div class="card">
+                <h4>Decision</h4>
+                <p>Neo4j is the source of truth (single write path). ClickHouse is read-only replicated view. Sync via direct inserts on write (Phase 1), Kafka later (Phase 5+).</p>
+                <h4>Why</h4>
+                <ul>
+                    <li>Simplifies data consistency (no merge conflicts)</li>
+                    <li>Clear data lineage</li>
+                    <li>Can always re-materialize ClickHouse from Neo4j if corrupted</li>
+                </ul>
+            </div>
+
+            <h3>5. Wide Event Table (Not Pre-Sharded Fact Tables)</h3>
+            <div class="card secondary">
+                <h4>Decision</h4>
+                <p>Single ClickHouse table (~65 columns) for all events, not separate tables for campaigns, deals, leads, etc.</p>
+                <h4>Why</h4>
+                <ul>
+                    <li>Agent can query any dimension without knowing table structure</li>
+                    <li>Columnar DB makes wide tables efficient</li>
+                    <li>No schema migration when adding new dimension</li>
+                    <li>Natural for denormalized fact tables</li>
+                </ul>
+                <h4>Tradeoff</h4>
+                <p>Need careful denormalization and enrichment during sync to populate all columns.</p>
+            </div>
+        </section>
+
+        <!-- PHASES -->
+        <section id="phases">
+            <h2>Implementation Phases</h2>
+
+            <div class="highlight">
+                <strong>Total Duration:</strong> ~8-12 weeks (depending on team size and parallelization)<br>
+                <strong>Dependency:</strong> Phases can partially overlap, but Phase 4 requires Phases 0-3 complete
+            </div>
+
+            <h3>Phase 0: Infrastructure Setup (1 week)</h3>
+            <div class="card">
+                <p><span class="badge phase0">Phase 0</span></p>
+                <h4>Deliverables</h4>
+                <ul>
+                    <li>ClickHouse added to docker-compose</li>
+                    <li>New Python deps: clickhouse-connect, sqlglot, langgraph, langchain-core, langchain-openai</li>
+                    <li>GtmdbSettings extended with ClickHouse config + LLM API key</li>
+                    <li>.env.example updated with all new vars</li>
+                    <li>Both Neo4j + ClickHouse healthy on `docker compose up`</li>
+                </ul>
+                <h4>Files Changed</h4>
+                <ul>
+                    <li>docker-compose.yml</li>
+                    <li>pyproject.toml</li>
+                    <li>src/gtmdb/config.py</li>
+                    <li>.env.example</li>
+                </ul>
+            </div>
+
+            <h3>Phase 1: ClickHouse OLAP + Sync Layer (2-3 weeks)</h3>
+            <div class="card secondary">
+                <p><span class="badge phase1">Phase 1</span></p>
+                <h4>Objective</h4>
+                <p>Establish ClickHouse as the analytics store and sync Neo4j writes to it in real-time.</p>
+                <h4>Sub-phases</h4>
+                <ul>
+                    <li><strong>1a:</strong> ClickHouse async client wrapper + events table DDL bootstrap</li>
+                    <li><strong>1b:</strong> GtmEvent Pydantic model with all ~65 dimension columns</li>
+                    <li><strong>1c:</strong> Event enrichment (traverse Neo4j 1-2 hops for dimensions)</li>
+                    <li><strong>1d:</strong> Sync hooks in GraphAdapter (direct ClickHouse insert on write)</li>
+                    <li><strong>1e:</strong> Materializer CLI (gtmdb materialize) for bulk Neo4j → ClickHouse migration</li>
+                    <li><strong>1f:</strong> Tests + data verification</li>
+                </ul>
+                <h4>Files Created</h4>
+                <ul>
+                    <li>src/gtmdb/olap/client.py</li>
+                    <li>src/gtmdb/olap/schema.py</li>
+                    <li>src/gtmdb/olap/materialize.py</li>
+                    <li>src/gtmdb/events/schema.py</li>
+                    <li>src/gtmdb/events/enrichment.py</li>
+                    <li>src/gtmdb/events/hooks.py</li>
+                    <li>tests/test_clickhouse_client.py, test_materialize.py, etc.</li>
+                </ul>
+                <h4>Exit Criteria</h4>
+                <p>ClickHouse can be queried for GTM events. Existing Neo4j data is migrated. New writes sync automatically.</p>
+            </div>
+
+            <h3>Phase 2: Query Guard + Agent Tools (2 weeks)</h3>
+            <div class="card accent">
+                <p><span class="badge phase2">Phase 2</span></p>
+                <h4>Objective</h4>
+                <p>Build the permission model and query guards that make it safe for an agent to generate raw SQL/Cypher.</p>
+                <h4>Sub-phases</h4>
+                <ul>
+                    <li><strong>2a:</strong> QueryPermissions model + resolve_permissions FastAPI dependency</li>
+                    <li><strong>2b:</strong> SQL guard (sqlglot-based AST parsing, validation, tenant scoping)</li>
+                    <li><strong>2c:</strong> Cypher guard (write rejection, label validation, tenant scoping)</li>
+                    <li><strong>2d:</strong> Agent tools: execute_cypher, execute_sql, get_schema</li>
+                    <li><strong>2e:</strong> Guard tests (unit + adversarial)</li>
+                </ul>
+                <h4>Files Created</h4>
+                <ul>
+                    <li>src/gtmdb/guard/permissions.py</li>
+                    <li>src/gtmdb/guard/sql_guard.py</li>
+                    <li>src/gtmdb/guard/cypher_guard.py</li>
+                    <li>src/gtmdb/agent/tools.py</li>
+                    <li>tests/test_sql_guard.py, test_cypher_guard.py, etc.</li>
+                </ul>
+                <h4>Exit Criteria</h4>
+                <p>All queries (valid and adversarial) pass through guards and are correctly scoped. Agent tools are ready to use.</p>
+            </div>
+
+            <h3>Phase 3: LangGraph Planner Agent (2 weeks)</h3>
+            <div class="card">
+                <p><span class="badge phase3">Phase 3</span></p>
+                <h4>Objective</h4>
+                <p>Build the LangGraph state machine that decomposes questions into tool calls and coordinates execution.</p>
+                <h4>Sub-phases</h4>
+                <ul>
+                    <li><strong>3a:</strong> LangGraph planner state graph (agent node + tool node)</li>
+                    <li><strong>3b:</strong> System prompt with schema context + permission summary</li>
+                    <li><strong>3c:</strong> Self-healing error handler (max 3 retries)</li>
+                    <li><strong>3d:</strong> Complexity classifier (crud vs single_olap vs multi_engine)</li>
+                    <li><strong>3e:</strong> Plan caching by question embedding similarity</li>
+                    <li><strong>3f:</strong> End-to-end agent tests</li>
+                </ul>
+                <h4>Files Created</h4>
+                <ul>
+                    <li>src/gtmdb/agent/planner.py</li>
+                    <li>src/gtmdb/agent/prompts.py</li>
+                    <li>src/gtmdb/agent/healing.py</li>
+                    <li>src/gtmdb/agent/classifier.py</li>
+                    <li>src/gtmdb/agent/cache.py</li>
+                    <li>tests/test_planner.py, test_agent_e2e.py</li>
+                </ul>
+                <h4>Exit Criteria</h4>
+                <p>Agent can handle real questions, generate correct queries, self-heal on errors. E2E tests pass.</p>
+            </div>
+
+            <h3>Phase 4: Interface + Documentation (1 week)</h3>
+            <div class="card secondary">
+                <p><span class="badge phase4">Phase 4</span></p>
+                <h4>Objective</h4>
+                <p>Expose the agent via REST API and MCP, document everything.</p>
+                <h4>Sub-phases</h4>
+                <ul>
+                    <li><strong>4a:</strong> POST /v1/ask endpoint with resolve_permissions</li>
+                    <li><strong>4b:</strong> MCP server exposing gtmdb_ask tool</li>
+                    <li><strong>4c:</strong> Update SKILL.md, README, API reference</li>
+                    <li><strong>4d:</strong> Production deployment guide (ClickHouse Cloud, Railway, env setup)</li>
+                    <li><strong>4e:</strong> Event catalog documentation</li>
+                </ul>
+                <h4>Files Created/Modified</h4>
+                <ul>
+                    <li>src/gtmdb/server/routers/ask.py</li>
+                    <li>src/gtmdb/mcp/server.py</li>
+                    <li>skills/gtmdb/SKILL.md</li>
+                    <li>README.md</li>
+                    <li>docs/deployment.md</li>
+                    <li>docs/event-catalog.md</li>
+                </ul>
+                <h4>Exit Criteria</h4>
+                <p>External agents can call /v1/ask. Documentation is complete. Deployable to production.</p>
+            </div>
+
+            <h3>Future: Event Bus (Kafka/Redpanda)</h3>
+            <div class="card">
+                <p><span class="badge">Future</span></p>
+                <p>Phase 5+ deferred. Replace direct ClickHouse insert with async Kafka producer/consumer for higher throughput and decoupling.</p>
+            </div>
+        </section>
+
+        <!-- SECURITY -->
+        <section id="security">
+            <h2>Security & Permission Model</h2>
+
+            <h3>QueryPermissions Model</h3>
+            <div class="card">
+                <p>Every request is associated with a QueryPermissions object, resolved from the API key at request time:</p>
+                <pre><code>@dataclass
+class QueryPermissions:
+    tenant_id: str                      # Which tenant owns this request
+    allowed_labels: set[str] | None     # Graph node types (None = all)
+    allowed_edge_types: set[str] | None # Relationships (None = all)
+    allowed_event_categories: set[str]  # Event types (lifecycle, attribution, etc.)
+    allowed_columns: set[str] | None    # ClickHouse columns (None = all)
+    max_rows: int = 1000                # Query result cap
+    read_only: bool = True              # Always true for agent</code></pre>
+                <p><strong>Key principle:</strong> The agent NEVER controls this. It's resolved by the API layer and passed immutably to the agent.</p>
+            </div>
+
+            <h3>Three-Layer Permission Guard</h3>
+
+            <h4>Layer 1: Agent Awareness (Soft Guardrail)</h4>
+            <div class="card">
+                <p>System prompt tells the agent what it can access:</p>
+                <pre><code>"You can access the following graph nodes: Campaign, Lead, Channel, Account.
+You can query these ClickHouse event categories: attribution, lifecycle, subscription.
+Available columns: campaign_id, campaign_name, lead_id, lead_status, deal_amount, etc.
+..."</code></pre>
+                <p><strong>Why soft:</strong> It's an LLM; it might forget or misunderstand. We don't rely on this alone.</p>
+            </div>
+
+            <h4>Layer 2: Query Guard (Medium Guardrail)</h4>
+            <div class="card secondary">
+                <h4>SQL Guard (ClickHouse)</h4>
+                <p>Uses <code>sqlglot</code> to parse SQL into an AST and validate before execution:</p>
+                <ul>
+                    <li>Reject non-SELECT operations</li>
+                    <li>Extract all referenced columns, validate against allowed_columns</li>
+                    <li>Inject tenant_id filter (always, agent can't omit it)</li>
+                    <li>Enforce event_category filter if restricted</li>
+                    <li>Cap LIMIT to max_rows</li>
+                </ul>
+                <h4>Cypher Guard (Neo4j)</h4>
+                <ul>
+                    <li>Reject all write keywords (CREATE, DELETE, DETACH, SET, REMOVE, MERGE, DROP)</li>
+                    <li>Extract node labels from query, validate against allowed_labels</li>
+                    <li>Extract relationship types, validate against allowed_edge_types</li>
+                    <li>Inject tenant_id scoping if missing</li>
+                </ul>
+                <p><strong>Why medium:</strong> Catches 99% of violations, but sophisticated attacks might slip through (though db-level guard catches them).</p>
+            </div>
+
+            <h4>Layer 3: Database-Level Enforcement (Hard Backstop)</h4>
+            <div class="card accent">
+                <h4>ClickHouse</h4>
+                <ul>
+                    <li>Agent connects via read-only user (separate from CRUD user)</li>
+                    <li>Row policy enforced: <code>CREATE ROW POLICY tenant_iso ON events USING tenant_id = currentUser()</code></li>
+                    <li>Even if Layer 2 fails and agent queries without tenant_id, row policy blocks inter-tenant data leaks</li>
+                </ul>
+                <h4>Neo4j</h4>
+                <ul>
+                    <li>Agent uses separate read-only connection (distinct from write connection)</li>
+                    <li>DB driver-level enforcement prevents writes</li>
+                </ul>
+                <p><strong>Why hard:</strong> DB-enforced, can't be bypassed by application code.</p>
+            </div>
+
+            <h3>Attack Scenarios</h3>
+            <table>
+                <tr>
+                    <th>Attack</th>
+                    <th>Layer Caught</th>
+                    <th>Details</th>
+                </tr>
+                <tr>
+                    <td>Agent generates non-SELECT query</td>
+                    <td>Layer 2 (Guard)</td>
+                    <td>Guard rejects DELETE, INSERT, DROP, etc.</td>
+                </tr>
+                <tr>
+                    <td>Agent accesses forbidden column</td>
+                    <td>Layer 2 (Guard)</td>
+                    <td>Guard validates against allowed_columns</td>
+                </tr>
+                <tr>
+                    <td>Agent queries without tenant_id filter</td>
+                    <td>Layer 3 (DB)</td>
+                    <td>Row policy filters rows by tenant</td>
+                </tr>
+                <tr>
+                    <td>Agent accesses forbidden graph node</td>
+                    <td>Layer 2 (Guard)</td>
+                    <td>Guard validates labels in Cypher</td>
+                </tr>
+                <tr>
+                    <td>Query result exceeds max_rows</td>
+                    <td>Layer 2 (Guard)</td>
+                    <td>Guard enforces LIMIT cap</td>
+                </tr>
+                <tr>
+                    <td>Agent generates syntactically invalid SQL</td>
+                    <td>Layer 2 (Guard)</td>
+                    <td>Guard returns error, agent self-heals and retries</td>
+                </tr>
+            </table>
+
+            <h3>Self-Healing Error Flow</h3>
+            <div class="card warning">
+                <ol>
+                    <li>Agent generates a query and calls a tool</li>
+                    <li>Guard validates it:
+                        <ul>
+                            <li>If permission error: "Column X not permitted" → Agent retries with different column</li>
+                            <li>If syntax error: DB error message → Agent fixes syntax and retries</li>
+                            <li>If valid: Query executes, results returned to agent</li>
+                        </ul>
+                    </li>
+                    <li>Max 3 retries per query. If still failing, agent gives up and reports to user.</li>
+                    <li>User can refine their question and try again.</li>
+                </ol>
+            </div>
+        </section>
+
+        <!-- TECH STACK -->
+        <section id="tech">
+            <h2>Technology Stack</h2>
+
+            <h3>Core Dependencies</h3>
+            <table>
+                <tr>
+                    <th>Package</th>
+                    <th>Version</th>
+                    <th>Purpose</th>
+                </tr>
+                <tr>
+                    <td>clickhouse-connect</td>
+                    <td>Latest</td>
+                    <td>Async ClickHouse client for Python</td>
+                </tr>
+                <tr>
+                    <td>sqlglot</td>
+                    <td>Latest</td>
+                    <td>SQL parser for validation and AST manipulation</td>
+                </tr>
+                <tr>
+                    <td>langgraph</td>
+                    <td>>=0.4</td>
+                    <td>State machine framework for LLM agent orchestration</td>
+                </tr>
+                <tr>
+                    <td>langchain-core</td>
+                    <td>>=0.3</td>
+                    <td>LLM abstractions (messages, tools, etc.)</td>
+                </tr>
+                <tr>
+                    <td>langchain-openai</td>
+                    <td>>=0.3</td>
+                    <td>OpenAI chat model bindings</td>
+                </tr>
+            </table>
+
+            <h3>Development Environment</h3>
+            <div class="card">
+                <p><strong>Docker Compose Services:</strong></p>
+                <ul>
+                    <li><strong>Neo4j 5.x</strong> - Existing graph DB</li>
+                    <li><strong>ClickHouse 25.3+</strong> - OLAP analytics store</li>
+                </ul>
+                <p><strong>Local Configuration:</strong></p>
+                <ul>
+                    <li>Python 3.11+</li>
+                    <li>FastAPI server</li>
+                    <li>OpenAI API key (for gpt-4o-mini / gpt-4o)</li>
+                </ul>
+            </div>
+
+            <h3>Production Environment</h3>
+            <div class="card secondary">
+                <h4>ClickHouse Options</h4>
+                <ul>
+                    <li><strong>ClickHouse Cloud:</strong> Managed, $66/month basic tier, recommended</li>
+                    <li><strong>Railway Template:</strong> Pre-configured PostgreSQL-style deployment</li>
+                    <li><strong>Self-Hosted:</strong> Kubernetes on your infra</li>
+                </ul>
+                <h4>API Hosting</h4>
+                <ul>
+                    <li><strong>Railway:</strong> Simple FastAPI deployment, GitHub-integrated CI/CD</li>
+                    <li><strong>AWS ECS:</strong> Container orchestration</li>
+                    <li><strong>GCP Cloud Run:</strong> Serverless Python</li>
+                </ul>
+                <h4>LLM Provider</h4>
+                <ul>
+                    <li><strong>OpenAI:</strong> gpt-4o for complex queries, gpt-4o-mini for classification</li>
+                    <li><strong>Azure OpenAI / Anthropic:</strong> Drop-in replacements via LangChain</li>
+                </ul>
+            </div>
+
+            <h3>Monitoring & Observability</h3>
+            <div class="card accent">
+                <ul>
+                    <li><strong>ClickHouse query logs:</strong> Query execution time, memory usage, bytes read</li>
+                    <li><strong>Agent latency:</strong> Time from question to answer (guard time, LLM time, execution time)</li>
+                    <li><strong>Error rates:</strong> Permission violations, syntax errors, retries</li>
+                    <li><strong>Cache hit rate:</strong> How often cached plans are reused</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- TIMELINE -->
+        <section id="timeline">
+            <h2>Development Timeline & Dependencies</h2>
+
+            <h3>Phase Dependencies Graph</h3>
+            <div class="card">
+                <pre>
+Phase 0: Infrastructure Setup
+    ├─→ Phase 1a: ClickHouse Client
+    │    ├─→ Phase 1b: Event Schema (parallel)
+    │    ├─→ Phase 1c: Materializer
+    │    └─→ Phase 2b: SQL Guard (depends on 1a)
+    │
+    ├─→ Phase 2a: Permission Model
+    │    ├─→ Phase 2b: SQL Guard
+    │    ├─→ Phase 2c: Cypher Guard
+    │    └─→ Phase 2d: Agent Tools
+    │
+    ├─→ Phase 3: LangGraph Agent
+    │    ├─→ Phase 4a: /v1/ask Endpoint
+    │    └─→ Phase 4b: Documentation
+                </pre>
+            </div>
+
+            <h3>Timeline Estimates</h3>
+            <table>
+                <tr>
+                    <th>Phase</th>
+                    <th>Duration</th>
+                    <th>Parallelizable</th>
+                    <th>Blockers</th>
+                </tr>
+                <tr>
+                    <td>Phase 0</td>
+                    <td>1 week</td>
+                    <td>No</td>
+                    <td>None (startup)</td>
+                </tr>
+                <tr>
+                    <td>Phase 1</td>
+                    <td>2-3 weeks</td>
+                    <td>Partial (1a-1b in parallel)</td>
+                    <td>Phase 0</td>
+                </tr>
+                <tr>
+                    <td>Phase 2</td>
+                    <td>2 weeks</td>
+                    <td>Partial (2b-2c in parallel)</td>
+                    <td>Phase 1a (for testing), Phase 2a</td>
+                </tr>
+                <tr>
+                    <td>Phase 3</td>
+                    <td>2 weeks</td>
+                    <td>Sequential</td>
+                    <td>Phase 2 (tools must exist)</td>
+                </tr>
+                <tr>
+                    <td>Phase 4</td>
+                    <td>1 week</td>
+                    <td>Partial</td>
+                    <td>Phase 3 (agent working)</td>
+                </tr>
+                <tr>
+                    <td><strong>Total</strong></td>
+                    <td><strong>8-12 weeks</strong></td>
+                    <td>—</td>
+                    <td>—</td>
+                </tr>
+            </table>
+
+            <div class="highlight">
+                <strong>With 2 developers and smart parallelization, achievable in 8 weeks.</strong><br>
+                Phases 1 (events/ClickHouse) and Phase 2 (guards/permissions) can run mostly in parallel once Phase 0 is done.
+            </div>
+
+            <h3>Team Recommendations</h3>
+            <div class="grid">
+                <div class="grid-item">
+                    <h4>Developer 1: Data Pipeline</h4>
+                    <ul>
+                        <li>Phase 0 (infra)</li>
+                        <li>Phase 1 (ClickHouse, events, sync)</li>
+                        <li>Phase 1e (materializer)</li>
+                    </ul>
+                </div>
+                <div class="grid-item">
+                    <h4>Developer 2: Agent & Safety</h4>
+                    <ul>
+                        <li>Phase 2 (guards, permissions)</li>
+                        <li>Phase 3 (agent)</li>
+                        <li>Phase 4 (API exposure)</li>
+                    </ul>
+                </div>
+                <div class="grid-item">
+                    <h4>DevOps/QA (Part-time)</h4>
+                    <ul>
+                        <li>Docker setup</li>
+                        <li>Testing & adversarial scenarios</li>
+                        <li>Deployment pipeline</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- DETAILS -->
+        <section id="details">
+            <h2>Implementation Details</h2>
+
+            <h3>File Structure (New Files)</h3>
+            <pre><code>src/gtmdb/
+├── events/
+│   ├── schema.py          # GtmEvent Pydantic model (~65 columns)
+│   ├── enrichment.py      # Traverse Neo4j for dimension context
+│   └── hooks.py           # on_node_created, on_edge_created → ClickHouse
+├── olap/
+│   ├── client.py          # Async ClickHouse wrapper
+│   ├── schema.py          # Events table DDL
+│   └── materialize.py     # Neo4j → ClickHouse bulk migration
+├── guard/
+│   ├── permissions.py     # QueryPermissions model
+│   ├── sql_guard.py       # sqlglot-based SQL validation
+│   └── cypher_guard.py    # Cypher write-rejection + label validation
+├── agent/
+│   ├── planner.py         # LangGraph state machine
+│   ├── tools.py           # execute_cypher, execute_sql, get_schema
+│   ├── prompts.py         # System prompt with schema context
+│   ├── classifier.py      # Complexity classification
+│   ├── healing.py         # Self-healing error handler
+│   └── cache.py           # Plan caching
+├── mcp/
+│   └── server.py          # MCP tool definitions
+└── server/routers/
+    └── ask.py             # POST /v1/ask endpoint</code></pre>
+
+            <h3>ClickHouse Events Table Schema</h3>
+            <div class="card">
+                <p><strong>Single wide table, ~65 columns, MergeTree engine:</strong></p>
+                <ul>
+                    <li>Core: event_id, tenant_id, event_type, event_category, occurred_at</li>
+                    <li>Dimensions: campaign_*, channel_*, account_*, product_*, lead_*, deal_*, visitor_*, subscription_*, content_*, contact_*</li>
+                    <li>Partitioned by month: PARTITION BY toYYYYMM(occurred_at)</li>
+                    <li>Ordered by: (tenant_id, event_category, event_type, occurred_at)</li>
+                </ul>
+                <p><strong>Why wide?</strong> Agent can query any column independently without schema knowledge. Columnar DB makes it efficient.</p>
+            </div>
+
+            <h3>Agent Tool Definitions</h3>
+            <div class="card secondary">
+                <h4>Tool 1: execute_cypher</h4>
+                <pre><code>@tool
+async def execute_cypher(query: str, params: dict | None = None) -> list[dict]:
+    """Run a read-only Cypher query against the Neo4j graph.
+    Available node types: Lead, Contact, Deal, Campaign, Account, Visitor, 
+                         Channel, Product, Content, EmailCampaign, Email, ProductAccount
+    """
+    safe_query = validate_and_scope_cypher(query, _current_permissions())
+    return await graph.execute_read(safe_query, params or {})</code></pre>
+
+                <h4>Tool 2: execute_sql</h4>
+                <pre><code>@tool
+async def execute_sql(query: str, params: dict | None = None) -> list[dict]:
+    """Run a read-only SQL query against the ClickHouse events table.
+    The events table has ~65 columns covering all GTM dimensions.
+    """
+    safe_query = validate_and_scope_sql(query, _current_permissions())
+    return await ch.query(safe_query, params or {})</code></pre>
+
+                <h4>Tool 3: get_schema</h4>
+                <pre><code>@tool
+async def get_schema() -> dict:
+    """Returns the graph schema and ClickHouse columns.
+    Use this to understand what data is available before writing queries.
+    """
+    return {
+        "graph": await graph.get_schema(),
+        "clickhouse_columns": EVENTS_TABLE_COLUMNS,
+    }</code></pre>
+            </div>
+
+            <h3>System Prompt Structure</h3>
+            <div class="card accent">
+                <p>The agent's system prompt includes (generated dynamically):</p>
+                <ol>
+                    <li><strong>Role:</strong> "You are the gtmDB query planner..."</li>
+                    <li><strong>Graph schema:</strong> Node types, edge types, properties</li>
+                    <li><strong>ClickHouse schema:</strong> Event types, columns, data types</li>
+                    <li><strong>Permission summary:</strong> "You may access: {allowed_labels}, {allowed_categories}..."</li>
+                    <li><strong>Tool instructions:</strong> When to use Cypher (traversals), when to use SQL (aggregations)</li>
+                    <li><strong>Examples:</strong> Sample questions and expected Cypher/SQL</li>
+                </ol>
+            </div>
+
+            <h3>Query Flow: End-to-End Example</h3>
+            <div class="card">
+                <h4>User Question</h4>
+                <p>"What are my best campaigns by LTV in the last 3 months, and show me the campaigns' content?"</p>
+                
+                <h4>Agent Steps</h4>
+                <ol>
+                    <li><strong>Classify:</strong> "multi_engine" (needs SQL for LTV aggregation + Cypher for content graph traversal)</li>
+                    <li><strong>Call execute_sql:</strong> Generate query to aggregate deal_amount by campaign from events table where occurred_at > 3 months ago</li>
+                    <li><strong>Guard validates:</strong> Checks columns, injects tenant_id, enforces LIMIT</li>
+                    <li><strong>Get results:</strong> Top 10 campaigns by LTV</li>
+                    <li><strong>For each campaign:</strong> Call execute_cypher to traverse (Campaign)←[:CONTENT]-(Content) to fetch associated content</li>
+                    <li><strong>Guard validates:</strong> Checks labels (Campaign, Content), injects tenant_id</li>
+                    <li><strong>Combine results:</strong> Agent enriches campaign LTV data with content details in its reasoning</li>
+                    <li><strong>Return:</strong> Structured answer with campaigns, LTV, and associated content</li>
+                </ol>
+                
+                <h4>If Errors Occur</h4>
+                <p>If Cypher syntax is invalid, guard returns error. Agent sees error, self-corrects, retries (max 3 times). If guard rejects for permission, agent acknowledges and tries a different approach.</p>
+            </div>
+
+            <h3>Testing Strategy</h3>
+            <div class="card secondary">
+                <h4>Unit Tests</h4>
+                <ul>
+                    <li>SQL guard: parse/validate/rewrite queries</li>
+                    <li>Cypher guard: reject writes, validate labels</li>
+                    <li>Permission model: resolve from API keys</li>
+                </ul>
+                <h4>Integration Tests</h4>
+                <ul>
+                    <li>ClickHouse client: connect, insert, query</li>
+                    <li>Materializer: Neo4j → ClickHouse sync</li>
+                    <li>Agent end-to-end: real questions against seeded data</li>
+                </ul>
+                <h4>Adversarial Tests</h4>
+                <ul>
+                    <li>Queries like <code>SELECT * FROM system.processes</code></li>
+                    <li>Cross-tenant injection attempts</li>
+                    <li>Write operations disguised in comments</li>
+                </ul>
+            </div>
+
+            <h3>Deployment Checklist</h3>
+            <div class="card warning">
+                <h4>Pre-Deployment</h4>
+                <ul>
+                    <li>All 4 phases complete and tested</li>
+                    <li>Adversarial test suite passes</li>
+                    <li>ClickHouse schema deployed and tested</li>
+                    <li>OpenAI API key configured</li>
+                    <li>Permission model integrated with auth system</li>
+                </ul>
+                <h4>Deployment</h4>
+                <ul>
+                    <li>ClickHouse Cloud instance created</li>
+                    <li>Railway/cloud deploy configured with env vars</li>
+                    <li>Run <code>gtmdb materialize</code> to populate ClickHouse from Neo4j</li>
+                    <li>Test /v1/ask endpoint with sample questions</li>
+                </ul>
+                <h4>Post-Deployment</h4>
+                <ul>
+                    <li>Monitor query performance & guard validation rates</li>
+                    <li>Collect user feedback on agent accuracy</li>
+                    <li>Tune system prompt based on question patterns</li>
+                    <li>Plan Phase 5 (Kafka event bus) if needed</li>
+                </ul>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <p>gtmDB Agent Query Layer Design | Complete Implementation Plan</p>
+            <p style="margin-top: 10px; font-size: 0.9em;">Last updated: April 2026</p>
+        </footer>
+    </div>
+
+    <script>
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+            // Show selected section
+            document.getElementById(sectionId).classList.add('active');
+            
+            // Update nav buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
+    </script>
+</body>
+</html>
