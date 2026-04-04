@@ -34,7 +34,8 @@ class GtmdbSettings(BaseSettings):
 
     # ClickHouse (OLAP analytics store)
     clickhouse_host: str = Field(default="localhost", description="ClickHouse server host")
-    clickhouse_port: int = Field(default=8123, description="ClickHouse HTTP port")
+    clickhouse_port: int = Field(default=8123, description="ClickHouse HTTP port (8443 for Cloud/TLS)")
+    clickhouse_secure: bool = Field(default=False, description="Use TLS — set true for ClickHouse Cloud")
     clickhouse_user: str = Field(default="dev", description="ClickHouse user")
     clickhouse_password: str = Field(default="", description="ClickHouse password")
     clickhouse_database: str = Field(default="gtmdb", description="ClickHouse database name")

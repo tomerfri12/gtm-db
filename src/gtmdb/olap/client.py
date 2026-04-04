@@ -48,6 +48,7 @@ class ClickHouseClient:
         inner: AsyncClient = await clickhouse_connect.get_async_client(
             host=settings.clickhouse_host,
             port=settings.clickhouse_port,
+            secure=settings.clickhouse_secure,
             username=settings.clickhouse_user,
             password=settings.clickhouse_password,
             database=settings.clickhouse_database,
