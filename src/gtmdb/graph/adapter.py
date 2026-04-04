@@ -18,6 +18,7 @@ from gtmdb.config import GtmdbSettings
 from gtmdb.graph import schema as _schema
 from gtmdb.graph.mutations import cypher_create_edge, cypher_create_node
 from gtmdb.graph import traversal as tr
+from gtmdb.guard import QueryGuard
 from gtmdb.scope import Scope
 from gtmdb.types import EdgeData, NodeData
 
@@ -646,7 +647,15 @@ class GraphAdapter:
     async def execute(
         self, scope: Scope, query: str, params: dict | None = None
     ) -> list[dict]:
-        """Run raw Cypher with tenant_id injected into params."""
+        """Run raw Cypher with tenant_id injected into params.
+
+        Applies :class:`~gtmdb.guard.QueryGuard` from ``scope`` policies before
+        the query reaches Neo4j (denied labels, write keywords).
+        """
+        guard = QueryGuard(scope)
+        err = guard.check_cypher(query)
+        if err:
+            raise PermissionError(err)
         p = dict(params or {})
         p["tenant_id"] = scope.tenant_id
         async with self._driver.session() as session:

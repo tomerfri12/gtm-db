@@ -54,6 +54,10 @@ class AnalystRunner:
         Tenant to scope all queries to. Defaults to ``db``'s configured tenant.
     model:
         OpenAI model name override (default: ``GtmdbSettings.planner_model``).
+    scope:
+        Optional :class:`~gtmdb.scope.Scope` instance. When provided, the
+        caller's permission set is injected into the agent's system prompt
+        (Layer 1 awareness) and made available to the query guard (Layer 2).
     """
 
     def __init__(
@@ -62,6 +66,7 @@ class AnalystRunner:
         *,
         tenant_id: str | None = None,
         model: str | None = None,
+        scope=None,
     ) -> None:
         self._db = db
         settings = GtmdbSettings()
@@ -69,6 +74,7 @@ class AnalystRunner:
         self._tenant_id = tenant_id or settings.default_tenant_id
         self._model = model or settings.planner_model
         self._api_key = settings.openai_api_key
+        self._scope = scope
 
         if not self._api_key:
             raise ValueError(
@@ -76,15 +82,16 @@ class AnalystRunner:
                 "Add it to .env to use the Analyst agent."
             )
 
-        # Build schema context once
-        system_prompt = build_system_prompt(self._tenant_id)
+        # Build schema context — includes permission summary when scope is provided
+        system_prompt = build_system_prompt(self._tenant_id, scope=scope)
 
-        # Wire tools to live adapters
+        # Wire tools to live adapters (scope passed for Layer 2 guard)
         _tools.configure(
             graph_adapter=db._graph,
             olap_store=db._olap_store,
             tenant_id=self._tenant_id,
             schema_text=system_prompt,
+            scope=scope,
         )
 
         # Compile the LangGraph agent
@@ -117,11 +124,19 @@ class AnalystRunner:
             raw_messages=all_messages,
         )
 
-    async def stream(self, question: str) -> AsyncIterator[str]:
-        """Stream intermediate steps and the final answer as text chunks."""
+    async def stream(self, question: str, *, verbose: bool = False) -> AsyncIterator[str]:
+        """Stream intermediate steps and the final answer as text chunks.
+
+        Parameters
+        ----------
+        verbose:
+            When True, emit each tool call with the full query and a preview
+            of the result so the caller can see the agent's plan step-by-step.
+        """
         log.info("[analyst] stream: %s", question)
 
         messages = [HumanMessage(content=question)]
+        step = 0
 
         async for event in self._graph.astream(
             {"messages": messages},
@@ -130,14 +145,30 @@ class AnalystRunner:
             last = event["messages"][-1]
 
             if isinstance(last, AIMessage):
-                if last.content:
-                    yield last.content
-                elif last.tool_calls:
+                if last.tool_calls and verbose:
+                    step += 1
                     for tc in last.tool_calls:
-                        yield f"\n[calling {tc['name']}]\n"
+                        tool_name = tc["name"]
+                        args = tc.get("args", {})
+                        query = args.get("query", "")
+                        lang = "sql" if tool_name == "execute_sql" else "cypher"
+                        header = f"\n{'─'*60}\nStep {step} → {tool_name}"
+                        if query:
+                            header += f"\n\n```{lang}\n{query.strip()}\n```"
+                        yield header + "\n"
+                elif last.tool_calls and not verbose:
+                    for tc in last.tool_calls:
+                        yield f"\n[{tc['name']}]\n"
+                elif last.content:
+                    yield last.content
 
             elif isinstance(last, ToolMessage):
-                yield f"[{last.name} result]: {last.content[:300]}{'...' if len(last.content) > 300 else ''}\n"
+                if verbose:
+                    preview = last.content[:500]
+                    ellipsis = "…" if len(last.content) > 500 else ""
+                    yield f"\nResult preview:\n{preview}{ellipsis}\n"
+                else:
+                    yield f"[result]: {last.content[:200]}{'…' if len(last.content) > 200 else ''}\n"
 
 
 # ---------------------------------------------------------------------------

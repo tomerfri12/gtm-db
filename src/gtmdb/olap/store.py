@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Any
 
 from gtmdb.config import GtmdbSettings
+from gtmdb.guard import QueryGuard
 
 from .client import ClickHouseClient
 
@@ -64,8 +65,18 @@ class OlapStore:
         self,
         sql: str,
         parameters: dict[str, Any] | None = None,
+        *,
+        scope: object | None = None,
     ) -> list[dict[str, Any]]:
-        """Execute a SELECT and return results as a list of dicts."""
+        """Execute a SELECT and return results as a list of dicts.
+
+        When ``scope`` is provided, :class:`~gtmdb.guard.QueryGuard` runs first
+        (denied OLAP columns). Internal callers omit ``scope`` for full access.
+        """
+        if scope is not None:
+            err = QueryGuard(scope).check_sql(sql)
+            if err:
+                raise PermissionError(err)
         return await self._impl.query(sql, parameters)
 
     async def query_one(

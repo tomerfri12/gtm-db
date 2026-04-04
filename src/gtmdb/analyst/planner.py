@@ -10,11 +10,11 @@ import logging
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 
-from gtmdb.analyst.tools import execute_cypher, execute_sql, get_schema
+from gtmdb.analyst.tools import execute_cypher, execute_sql, get_schema, think
 
 log = logging.getLogger(__name__)
 
-TOOLS = [execute_sql, execute_cypher, get_schema]
+TOOLS = [think, execute_sql, execute_cypher, get_schema]
 
 
 def build_analyst_graph(
