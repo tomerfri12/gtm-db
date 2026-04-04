@@ -22,7 +22,7 @@ from gtmdb.scope import Scope
 from gtmdb.types import EdgeData, NodeData
 
 if TYPE_CHECKING:
-    from gtmdb.olap.sync import OlapSyncLayer
+    from gtmdb.olap.sync import OlapSync
 
 
 def _effective_neo4j_uri(uri: str, *, force_direct_bolt: bool) -> str:
@@ -43,10 +43,10 @@ def _effective_neo4j_uri(uri: str, *, force_direct_bolt: bool) -> str:
 class GraphAdapter:
     """Async Neo4j adapter with tenant isolation and scope checks."""
 
-    _olap: OlapSyncLayer | None = None
+    _olap: OlapSync | None = None
 
-    def attach_olap(self, sync: OlapSyncLayer) -> None:
-        """Attach an OlapSyncLayer to fire ClickHouse events after writes."""
+    def attach_olap(self, sync: OlapSync) -> None:
+        """Attach an OlapSync to fire OLAP store events after writes."""
         self._olap = sync
 
     def __init__(self, settings: GtmdbSettings) -> None:

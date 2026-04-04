@@ -13,7 +13,7 @@ from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from gtmdb.api_keys import ApiKeysManager
     from gtmdb.key_store import KeyStore
-    from gtmdb.olap.client import ClickHouseClient
+    from gtmdb.olap.store import OlapStore
 
 from gtmdb.api.accounts import AccountsAPI
 from gtmdb.api.actors import ActorsAPI
@@ -45,7 +45,7 @@ class GtmDB:
     def __init__(self, settings: GtmdbSettings | None = None) -> None:
         self._settings = settings or GtmdbSettings()
         self._graph = GraphAdapter(self._settings)
-        self._ch: ClickHouseClient | None = None
+        self._olap_store: OlapStore | None = None
 
         self._leads: LeadsAPI | None = None
         self._scores: ScoresAPI | None = None
@@ -80,19 +80,19 @@ class GtmDB:
             ks = self._get_key_store()
             await ks.init_db()
 
-        # ClickHouse OLAP sync (optional — skipped when host is not configured)
-        ch_host = (self._settings.clickhouse_host or "").strip()
-        if ch_host:
+        # OLAP store sync (optional — skipped when host is not configured)
+        olap_host = (self._settings.clickhouse_host or "").strip()
+        if olap_host:
             try:
-                from gtmdb.olap.client import ClickHouseClient
-                from gtmdb.olap.sync import OlapSyncLayer
-                self._ch = await ClickHouseClient.create(self._settings)
-                await self._ch.bootstrap()
-                self._graph.attach_olap(OlapSyncLayer(self._ch))
-                log.info("ClickHouse OLAP sync enabled (host=%s)", ch_host)
+                from gtmdb.olap.store import OlapStore
+                from gtmdb.olap.sync import OlapSync
+                self._olap_store = await OlapStore.create(self._settings)
+                await self._olap_store.bootstrap()
+                self._graph.attach_olap(OlapSync(self._olap_store))
+                log.info("OLAP sync enabled (host=%s)", olap_host)
             except Exception:
                 log.warning(
-                    "ClickHouse not reachable — OLAP sync disabled. "
+                    "OLAP store not reachable — sync disabled. "
                     "Run `gtmdb materialize` later to backfill.",
                     exc_info=True,
                 )
@@ -100,9 +100,9 @@ class GtmDB:
     async def close(self) -> None:
         """Shut down all connections. Call on application teardown."""
         await self._graph.close()
-        if self._ch is not None:
-            await self._ch.close()
-            self._ch = None
+        if self._olap_store is not None:
+            await self._olap_store.close()
+            self._olap_store = None
         if self._key_store is not None:
             await self._key_store.close()
             self._key_store = None

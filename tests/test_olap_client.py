@@ -16,23 +16,23 @@ from datetime import datetime, timezone
 import pytest
 
 from gtmdb.config import GtmdbSettings
-from gtmdb.olap.client import ClickHouseClient
 from gtmdb.olap.schema import EVENTS_COLUMNS
+from gtmdb.olap.store import OlapStore
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-async def _make_client() -> ClickHouseClient:
+async def _make_client() -> OlapStore:
     settings = GtmdbSettings()
-    client = await ClickHouseClient.create(settings)
-    reachable = await client.ping()
+    store = await OlapStore.create(settings)
+    reachable = await store.ping()
     if not reachable:
-        await client.close()
-        pytest.skip("ClickHouse not reachable — skipping OLAP tests")
-    await client.bootstrap()
-    return client
+        await store.close()
+        pytest.skip("OLAP store not reachable — skipping OLAP tests")
+    await store.bootstrap()
+    return store
 
 
 # ---------------------------------------------------------------------------
@@ -40,43 +40,43 @@ async def _make_client() -> ClickHouseClient:
 # ---------------------------------------------------------------------------
 
 async def test_ping() -> None:
-    client = await _make_client()
+    store = await _make_client()
     try:
-        assert await client.ping() is True
+        assert await store.ping() is True
     finally:
-        await client.close()
+        await store.close()
 
 
 async def test_bootstrap_idempotent() -> None:
     """Calling bootstrap twice must not raise."""
-    client = await _make_client()
+    store = await _make_client()
     try:
-        await client.bootstrap()
+        await store.bootstrap()
     finally:
-        await client.close()
+        await store.close()
 
 
 async def test_events_table_exists() -> None:
-    client = await _make_client()
+    store = await _make_client()
     try:
-        rows = await client.query(
+        rows = await store.query(
             "SELECT name FROM system.tables "
             "WHERE database = {db:String} AND name = 'events'",
-            {"db": client._database},
+            {"db": store._impl._database},
         )
         assert rows, "events table was not created"
         assert rows[0]["name"] == "events"
     finally:
-        await client.close()
+        await store.close()
 
 
 async def test_column_count() -> None:
-    client = await _make_client()
+    store = await _make_client()
     try:
-        rows = await client.query(
+        rows = await store.query(
             "SELECT count() AS cnt FROM system.columns "
             "WHERE database = {db:String} AND table = 'events'",
-            {"db": client._database},
+            {"db": store._impl._database},
         )
         col_count = int(rows[0]["cnt"])
         assert col_count == len(EVENTS_COLUMNS), (
@@ -84,11 +84,11 @@ async def test_column_count() -> None:
             f"schema lists {len(EVENTS_COLUMNS)}"
         )
     finally:
-        await client.close()
+        await store.close()
 
 
 async def test_insert_and_query() -> None:
-    client = await _make_client()
+    store = await _make_client()
     try:
         tenant = "test-tenant-olap"
         event_id = str(uuid.uuid4())
@@ -117,10 +117,10 @@ async def test_insert_and_query() -> None:
             "channel_type": "paid_search",
         }
 
-        n = await client.insert_events([row])
+        n = await store.insert_events([row])
         assert n == 1
 
-        result = await client.query(
+        result = await store.query(
             "SELECT event_id, tenant_id, lead_status, campaign_name FROM events "
             "WHERE event_id = {eid:String}",
             {"eid": event_id},
@@ -132,11 +132,11 @@ async def test_insert_and_query() -> None:
         assert r["lead_status"] == "new"
         assert r["campaign_name"] == "Spring Launch"
     finally:
-        await client.close()
+        await store.close()
 
 
 async def test_insert_batch() -> None:
-    client = await _make_client()
+    store = await _make_client()
     try:
         tenant = f"test-tenant-batch-{uuid.uuid4().hex[:8]}"
         rows = [
@@ -152,32 +152,32 @@ async def test_insert_batch() -> None:
             }
             for _ in range(5)
         ]
-        n = await client.insert_events(rows)
+        n = await store.insert_events(rows)
         assert n == 5
 
-        result = await client.query(
+        result = await store.query(
             "SELECT count() AS cnt FROM events WHERE tenant_id = {tid:String}",
             {"tid": tenant},
         )
         assert int(result[0]["cnt"]) == 5
     finally:
-        await client.close()
+        await store.close()
 
 
 async def test_insert_empty() -> None:
-    client = await _make_client()
+    store = await _make_client()
     try:
-        n = await client.insert_events([])
+        n = await store.insert_events([])
         assert n == 0
     finally:
-        await client.close()
+        await store.close()
 
 
 async def test_query_one() -> None:
-    client = await _make_client()
+    store = await _make_client()
     try:
-        result = await client.query_one("SELECT 1 AS val")
+        result = await store.query_one("SELECT 1 AS val")
         assert result is not None
         assert int(result["val"]) == 1
     finally:
-        await client.close()
+        await store.close()

@@ -1,14 +1,14 @@
-"""OlapSyncLayer — fires ClickHouse events after every Neo4j write.
+"""OlapSync — fires OLAP store events after every Neo4j write.
 
 This is the glue between the graph write path and the OLAP store.
-``GraphAdapter`` holds an optional reference to ``OlapSyncLayer`` and calls
+``GraphAdapter`` holds an optional reference to ``OlapSync`` and calls
 ``on_node_created`` / ``on_edge_created`` after each successful write.
 
 Design
 ------
-* **Log-and-continue**: any ClickHouse failure is caught, logged, and
-  silently dropped.  Neo4j remains the source of truth; ClickHouse can
-  always be repopulated via ``gtmdb materialize``.
+* **Log-and-continue**: any OLAP store failure is caught, logged, and
+  silently dropped.  Neo4j remains the source of truth and can always be
+  repopulated via ``gtmdb materialize``.
 * **Awaited, not fire-and-forget**: keeps the code simple and makes tests
   deterministic.  The 2-5 ms overhead per write is acceptable.
 * **Edge enrichment via static label map**: avoids an extra Neo4j round-trip
@@ -30,9 +30,9 @@ if TYPE_CHECKING:
     from gtmdb.scope import Scope
     from gtmdb.types import EdgeData, NodeData
 
-from gtmdb.olap.client import ClickHouseClient
 from gtmdb.olap.enrichment import enrich_edge, enrich_node
 from gtmdb.olap.events import EDGE_EVENT_DEFAULTS
+from gtmdb.olap.store import OlapStore
 
 log = logging.getLogger(__name__)
 
@@ -57,11 +57,11 @@ _EDGE_LABELS: dict[str, tuple[str, str]] = {
 _SKIP_LABELS = frozenset({"Actor", "Score"})
 
 
-class OlapSyncLayer:
-    """Receives post-write callbacks and persists enriched events to ClickHouse."""
+class OlapSync:
+    """Receives post-write callbacks and persists enriched events to the OLAP store."""
 
-    def __init__(self, ch: ClickHouseClient) -> None:
-        self._ch = ch
+    def __init__(self, store: OlapStore) -> None:
+        self._store = store
 
     async def on_node_created(
         self,
@@ -80,7 +80,7 @@ class OlapSyncLayer:
                 label=node.label,
                 actor_id=str(node.properties.get("created_by_actor_id", "")),
             )
-            await self._ch.insert_events([event.to_row()])
+            await self._store.insert_events([event.to_row()])
             log.debug("OLAP sync: emitted %s for %s/%s", event.event_type, node.label, node.id)
         except Exception:
             log.warning(
@@ -113,7 +113,7 @@ class OlapSyncLayer:
                 to_label=to_label,
                 edge_type=edge.type,
             )
-            await self._ch.insert_events([event.to_row()])
+            await self._store.insert_events([event.to_row()])
             log.debug(
                 "OLAP sync: emitted %s for edge %s (%s→%s)",
                 event.event_type, edge.type, edge.from_id, edge.to_id,
@@ -150,7 +150,7 @@ class OlapSyncLayer:
                 event_type=event_type,
                 actor_id=actor_id,
             )
-            await self._ch.insert_events([event.to_row()])
+            await self._store.insert_events([event.to_row()])
         except Exception:
             log.warning(
                 "OLAP sync failed for %s/%s — event dropped",

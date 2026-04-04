@@ -9,14 +9,10 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from datetime import datetime, timezone
 
 import pytest
 
 from gtmdb.olap.events import (
-    CATEGORY_LIFECYCLE,
-    CATEGORY_PIPELINE,
-    CATEGORY_SUBSCRIPTION,
     EDGE_EVENT_DEFAULTS,
     NODE_EVENT_DEFAULTS,
     GtmEvent,
@@ -164,8 +160,8 @@ async def test_enrich_lead_node_roundtrip() -> None:
     from gtmdb import GtmDB, create_token_from_presets
     from gtmdb.api.models import ActorSpec
     from gtmdb.config import GtmdbSettings
-    from gtmdb.olap.client import ClickHouseClient
     from gtmdb.olap.enrichment import enrich_node
+    from gtmdb.olap.store import OlapStore
     from gtmdb.scope import Scope
 
     settings = GtmdbSettings()
@@ -194,7 +190,7 @@ async def test_enrich_lead_node_roundtrip() -> None:
     assert event.campaign_name == "Enrichment Test Camp"
     assert event.tenant_id == str(tid)
 
-    async with await ClickHouseClient.create(settings) as ch:
+    async with await OlapStore.create(settings) as ch:
         await ch.bootstrap()
         n = await ch.insert_events([event.to_row()])
         assert n == 1
