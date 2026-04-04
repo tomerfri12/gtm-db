@@ -192,6 +192,7 @@ async def _build_lookups(graph: GraphAdapter, scope: Scope) -> dict[str, dict[st
     lookups["pa_to_lead"] = pa_to_lead
 
     # ProductAccount → lead → Campaign (via SIGNED_UP_AS + SOURCED_FROM) — keyed by pa_id
+    # Fallback: only used when a Lead (not Visitor) signed up as this PA
     rows = await _batch(graph, scope, """
         MATCH (l:Lead {tenant_id: $tenant_id})-[:SIGNED_UP_AS]->(pa:ProductAccount)
         MATCH (l)-[:SOURCED_FROM]->(c:Campaign)
@@ -210,6 +211,46 @@ async def _build_lookups(graph: GraphAdapter, scope: Scope) -> dict[str, dict[st
         if r.get("pa_id") and r["pa_id"] not in pa_to_campaign:
             pa_to_campaign[r["pa_id"]] = r
     lookups["pa_to_campaign"] = pa_to_campaign
+
+    # Visitor → ProductAccount (via SIGNED_UP_AS) — keyed by pa_id
+    # Primary path in real data: Visitor signs up, not Lead
+    rows = await _batch(graph, scope, """
+        MATCH (v:Visitor {tenant_id: $tenant_id})-[:SIGNED_UP_AS]->(pa:ProductAccount)
+        RETURN pa.id AS pa_id,
+               v.visitor_id AS visitor_id,
+               v.source_channel AS visitor_channel,
+               v.signup_flow AS visitor_signup_flow,
+               v.signup_cluster AS visitor_signup_cluster,
+               v.seniority AS visitor_seniority,
+               v.product_intent AS visitor_product_intent,
+               v.team_size AS visitor_team_size
+    """)
+    pa_to_visitor: dict[str, dict] = {}
+    for r in rows:
+        if r.get("pa_id") and r["pa_id"] not in pa_to_visitor:
+            pa_to_visitor[r["pa_id"]] = r
+    lookups["pa_to_visitor"] = pa_to_visitor
+
+    # Visitor → ProductAccount + Campaign (SIGNED_UP_AS + TOUCHED) — keyed by pa_id
+    # Primary campaign attribution for PAs signed up by Visitors
+    rows = await _batch(graph, scope, """
+        MATCH (v:Visitor {tenant_id: $tenant_id})-[:SIGNED_UP_AS]->(pa:ProductAccount)
+        MATCH (v)-[:TOUCHED]->(c:Campaign)
+        OPTIONAL MATCH (c)-[:BELONGS_TO]->(ch:Channel)
+        RETURN pa.id AS pa_id,
+               c.id AS campaign_id, c.name AS campaign_name,
+               c.channel AS campaign_channel,
+               c.campaign_category AS campaign_category,
+               c.status AS campaign_status, c.budget AS campaign_budget,
+               ch.id AS channel_id, ch.name AS channel_name,
+               ch.channel_type AS channel_type
+        ORDER BY c.created_at ASC
+    """)
+    pa_to_visitor_campaign: dict[str, dict] = {}
+    for r in rows:
+        if r.get("pa_id") and r["pa_id"] not in pa_to_visitor_campaign:
+            pa_to_visitor_campaign[r["pa_id"]] = r
+    lookups["pa_to_visitor_campaign"] = pa_to_visitor_campaign
 
     # SubscriptionEvent → ProductAccount (via HAS_SUBSCRIPTION_EVENT, reversed)
     rows = await _batch(graph, scope, """
@@ -463,14 +504,31 @@ def _node_to_event(
         event.product_account_size_group = _s(props, "company_size_group")
         event.product_account_is_paying = _b(props, "is_paying")
         _apply_account_from_lookup(event, lookups["pa_to_account"].get(node_id))
-        lead_lk = lookups["pa_to_lead"].get(node_id)
-        if lead_lk:
-            event.lead_id = _s(lead_lk, "lead_id")
-            event.lead_status = _s(lead_lk, "lead_status")
-            event.lead_source = _s(lead_lk, "lead_source")
-            event.lead_company = _s(lead_lk, "lead_company")
-            event.lead_domain = _s(lead_lk, "lead_domain")
-        _apply_campaign_from_lookup(event, lookups["pa_to_campaign"].get(node_id))
+        # Primary path: Visitor signed up → carry visitor dims
+        vis_lk = lookups["pa_to_visitor"].get(node_id)
+        if vis_lk:
+            event.visitor_id = _s(vis_lk, "visitor_id")
+            event.visitor_channel = _s(vis_lk, "visitor_channel")
+            event.visitor_signup_flow = _s(vis_lk, "visitor_signup_flow")
+            event.visitor_signup_cluster = _s(vis_lk, "visitor_signup_cluster")
+            event.visitor_seniority = _s(vis_lk, "visitor_seniority")
+            event.visitor_product_intent = _s(vis_lk, "visitor_product_intent")
+            event.visitor_team_size = _s(vis_lk, "visitor_team_size")
+        else:
+            # Fallback: Lead signed up
+            lead_lk = lookups["pa_to_lead"].get(node_id)
+            if lead_lk:
+                event.lead_id = _s(lead_lk, "lead_id")
+                event.lead_status = _s(lead_lk, "lead_status")
+                event.lead_source = _s(lead_lk, "lead_source")
+                event.lead_company = _s(lead_lk, "lead_company")
+                event.lead_domain = _s(lead_lk, "lead_domain")
+        # Campaign: visitor-based first, lead-based fallback
+        _apply_campaign_from_lookup(
+            event,
+            lookups["pa_to_visitor_campaign"].get(node_id)
+            or lookups["pa_to_campaign"].get(node_id),
+        )
 
     elif label == "SubscriptionEvent":
         event.sub_event_type = _s(props, "event_type")
@@ -489,12 +547,27 @@ def _node_to_event(
             event.product_account_industry = _s(pa_lk, "pa_industry")
             event.product_account_size_group = _s(pa_lk, "pa_size_group")
             event.product_account_is_paying = _b(pa_lk, "pa_is_paying")
-            # Chain: SE → PA → lead → campaign
             pa_id = event.product_account_id
-            lead_lk = lookups["pa_to_lead"].get(pa_id)
-            if lead_lk:
-                event.lead_id = _s(lead_lk, "lead_id")
-            _apply_campaign_from_lookup(event, lookups["pa_to_campaign"].get(pa_id))
+            # Chain: SE → PA → Visitor (primary) or Lead (fallback)
+            vis_lk = lookups["pa_to_visitor"].get(pa_id)
+            if vis_lk:
+                event.visitor_id = _s(vis_lk, "visitor_id")
+                event.visitor_channel = _s(vis_lk, "visitor_channel")
+                event.visitor_signup_flow = _s(vis_lk, "visitor_signup_flow")
+                event.visitor_signup_cluster = _s(vis_lk, "visitor_signup_cluster")
+                event.visitor_seniority = _s(vis_lk, "visitor_seniority")
+                event.visitor_product_intent = _s(vis_lk, "visitor_product_intent")
+                event.visitor_team_size = _s(vis_lk, "visitor_team_size")
+            else:
+                lead_lk = lookups["pa_to_lead"].get(pa_id)
+                if lead_lk:
+                    event.lead_id = _s(lead_lk, "lead_id")
+            # Campaign: visitor-based first, lead-based fallback
+            _apply_campaign_from_lookup(
+                event,
+                lookups["pa_to_visitor_campaign"].get(pa_id)
+                or lookups["pa_to_campaign"].get(pa_id),
+            )
             _apply_account_from_lookup(event, lookups["pa_to_account"].get(pa_id))
         prod_lk = lookups["se_to_product"].get(node_id)
         if prod_lk:

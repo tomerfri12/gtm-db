@@ -152,6 +152,19 @@ async def _run_materialize(args: argparse.Namespace, *, api_key: str | None) -> 
         await db.close()
         return 1
 
+    if getattr(args, "clear", False) and not args.dry_run:
+        tenant_id = scope.tenant_id
+        print(f"Clearing existing events for tenant {tenant_id}…")
+        try:
+            await db._olap_store._impl._client.command(
+                f"DELETE FROM events WHERE tenant_id = '{tenant_id}'"
+            )
+            print("Clear complete.")
+        except Exception as e:
+            print(f"Clear failed: {e}", file=sys.stderr)
+            await db.close()
+            return 1
+
     mode = "[DRY RUN] " if args.dry_run else ""
     target = args.label or "all labels"
     print(f"{mode}Materializing {target} → OLAP store…")
@@ -243,6 +256,11 @@ def main() -> None:
         "--dry-run",
         action="store_true",
         help="Count nodes and build lookups but do not insert into the OLAP store.",
+    )
+    mat_p.add_argument(
+        "--clear",
+        action="store_true",
+        help="Delete all existing events for the tenant before inserting (idempotent re-run).",
     )
 
     # --- serve ---
