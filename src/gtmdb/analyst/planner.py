@@ -1,29 +1,14 @@
-"""LangGraph Analyst agent — state graph definition.
+"""LangGraph Analyst agent — built with the LangChain 1.x create_agent API.
 
-Graph shape
------------
-
-    [start] ──► [agent]  ◄─────────────────────┐
-                  │                             │
-          has tool calls?                       │
-                  │                             │
-           yes ──►[tools] ──► back to agent ───┘
-                  │
-           no (final answer)
-                  │
-               [END]
-
-The agent node calls the LLM (gpt-4o-mini by default).
-The tools node dispatches to execute_sql / execute_cypher / get_schema.
-LangGraph handles the loop automatically via `create_react_agent`.
+https://docs.langchain.com/oss/python/langchain/agents
 """
 
 from __future__ import annotations
 
 import logging
 
+from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
 
 from gtmdb.analyst.tools import execute_cypher, execute_sql, get_schema
 
@@ -39,13 +24,7 @@ def build_analyst_graph(
     openai_api_key: str,
     temperature: float = 0.0,
 ):
-    """Build and return the compiled LangGraph ReAct agent.
-
-    Uses `create_react_agent` which gives us:
-    - Automatic tool-call loop (agent → tools → agent → ... → END)
-    - Built-in message history
-    - Streaming support via `.astream()`
-    """
+    """Build and return the compiled analyst agent."""
     llm = ChatOpenAI(
         model=model,
         temperature=temperature,
@@ -53,11 +32,16 @@ def build_analyst_graph(
         streaming=True,
     )
 
-    graph = create_react_agent(
+    agent = create_agent(
         llm,
         tools=TOOLS,
-        prompt=system_prompt,
+        system_prompt=system_prompt,
+        name="analyst",
     )
 
-    log.info("[analyst] Graph compiled (model=%s, tools=%s)", model, [t.name for t in TOOLS])
-    return graph
+    log.info(
+        "[analyst] Agent compiled (model=%s, tools=%s)",
+        model,
+        [t.name for t in TOOLS],
+    )
+    return agent

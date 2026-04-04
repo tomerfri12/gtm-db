@@ -11,7 +11,7 @@ import json
 import logging
 from typing import Any
 
-from langchain_core.tools import tool
+from langchain.tools import tool
 
 log = logging.getLogger(__name__)
 
