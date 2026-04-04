@@ -9,7 +9,7 @@ field masking and redaction (hint/hide) per ``Scope``.
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import neo4j
 from neo4j import AsyncManagedTransaction
@@ -20,6 +20,9 @@ from gtmdb.graph.mutations import cypher_create_edge, cypher_create_node
 from gtmdb.graph import traversal as tr
 from gtmdb.scope import Scope
 from gtmdb.types import EdgeData, NodeData
+
+if TYPE_CHECKING:
+    from gtmdb.olap.sync import OlapSyncLayer
 
 
 def _effective_neo4j_uri(uri: str, *, force_direct_bolt: bool) -> str:
@@ -39,6 +42,12 @@ def _effective_neo4j_uri(uri: str, *, force_direct_bolt: bool) -> str:
 
 class GraphAdapter:
     """Async Neo4j adapter with tenant isolation and scope checks."""
+
+    _olap: OlapSyncLayer | None = None
+
+    def attach_olap(self, sync: OlapSyncLayer) -> None:
+        """Attach an OlapSyncLayer to fire ClickHouse events after writes."""
+        self._olap = sync
 
     def __init__(self, settings: GtmdbSettings) -> None:
         uri = _effective_neo4j_uri(
@@ -144,7 +153,7 @@ class GraphAdapter:
             result = await session.execute_write(
                 cypher_create_node, node.label, props
             )
-        return NodeData(
+        created = NodeData(
             label=node.label,
             id=result["id"],
             tenant_id=result["tenant_id"],
@@ -154,6 +163,9 @@ class GraphAdapter:
                 if k not in ("id", "tenant_id")
             },
         )
+        if self._olap is not None:
+            await self._olap.on_node_created(self, scope, created)
+        return created
 
     async def create_edge(self, scope: Scope, edge: EdgeData) -> EdgeData:
         if not scope.can_write(edge.type):
@@ -179,6 +191,8 @@ class GraphAdapter:
                 f"Could not create edge {edge.type}: one or both nodes not found "
                 f"(from={edge.from_id}, to={edge.to_id})"
             )
+        if self._olap is not None:
+            await self._olap.on_edge_created(self, scope, edge)
         return edge
 
     async def get_node(
@@ -609,6 +623,25 @@ class GraphAdapter:
             "discovery_truncated": discovery_truncated,
             "traverse_filter": traverse_filter,
         }
+
+    async def sync_node_to_olap(
+        self,
+        scope: Scope,
+        node_id: str,
+        label: str,
+        *,
+        event_type: str | None = None,
+        actor_id: str = "",
+    ) -> None:
+        """Fire an OLAP sync for a node created outside the normal create_node path.
+
+        No-op when no OlapSyncLayer is attached.
+        """
+        if self._olap is not None:
+            await self._olap.sync_node(
+                self, scope, node_id, label,
+                event_type=event_type, actor_id=actor_id,
+            )
 
     async def execute(
         self, scope: Scope, query: str, params: dict | None = None

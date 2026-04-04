@@ -7,11 +7,13 @@ or backend-specific adapters.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from gtmdb.api_keys import ApiKeysManager
     from gtmdb.key_store import KeyStore
+    from gtmdb.olap.client import ClickHouseClient
 
 from gtmdb.api.accounts import AccountsAPI
 from gtmdb.api.actors import ActorsAPI
@@ -34,6 +36,8 @@ from gtmdb.graph.adapter import GraphAdapter
 from gtmdb.scope import Scope
 from gtmdb.types import EdgeData, NodeData
 
+log = logging.getLogger(__name__)
+
 
 class GtmDB:
     """High-level async client for the GtmDB managed service."""
@@ -41,6 +45,7 @@ class GtmDB:
     def __init__(self, settings: GtmdbSettings | None = None) -> None:
         self._settings = settings or GtmdbSettings()
         self._graph = GraphAdapter(self._settings)
+        self._ch: ClickHouseClient | None = None
 
         self._leads: LeadsAPI | None = None
         self._scores: ScoresAPI | None = None
@@ -75,9 +80,29 @@ class GtmDB:
             ks = self._get_key_store()
             await ks.init_db()
 
+        # ClickHouse OLAP sync (optional — skipped when host is not configured)
+        ch_host = (self._settings.clickhouse_host or "").strip()
+        if ch_host:
+            try:
+                from gtmdb.olap.client import ClickHouseClient
+                from gtmdb.olap.sync import OlapSyncLayer
+                self._ch = await ClickHouseClient.create(self._settings)
+                await self._ch.bootstrap()
+                self._graph.attach_olap(OlapSyncLayer(self._ch))
+                log.info("ClickHouse OLAP sync enabled (host=%s)", ch_host)
+            except Exception:
+                log.warning(
+                    "ClickHouse not reachable — OLAP sync disabled. "
+                    "Run `gtmdb materialize` later to backfill.",
+                    exc_info=True,
+                )
+
     async def close(self) -> None:
         """Shut down all connections. Call on application teardown."""
         await self._graph.close()
+        if self._ch is not None:
+            await self._ch.close()
+            self._ch = None
         if self._key_store is not None:
             await self._key_store.close()
             self._key_store = None

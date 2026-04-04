@@ -180,4 +180,11 @@ ON CREATE SET fp.reasoning = coalesce(row.prod_link_reasoning, '')
                     self._CYPHER_BATCH_FOR_PRODUCT,
                     {"rows": fp_chunk},
                 )
+
+            # OLAP sync: enrich each created SubscriptionEvent and emit to ClickHouse
+            for event_id in key_to_eid.values():
+                await self._graph.sync_node_to_olap(
+                    scope, event_id, "SubscriptionEvent", actor_id=aid,
+                )
+
             _step()
