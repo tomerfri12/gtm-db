@@ -80,7 +80,7 @@ async def _run_keys(args: argparse.Namespace, *, api_key: str | None) -> int:
                 expires_in_days=args.expires_days,
                 created_by="cli",
             )
-            print(f"Key created. Store this — it will NOT be shown again:\n")
+            print("Key created. Store this — it will NOT be shown again:\n")
             print(f"  API Key:    {result.raw_key}")
             print(f"  Key ID:     {result.key_id}")
             print(f"  Owner:      {result.owner_id}")
@@ -120,6 +120,66 @@ async def _run_keys(args: argparse.Namespace, *, api_key: str | None) -> int:
     finally:
         await db.close()
 
+    return 0
+
+
+async def _run_materialize(args: argparse.Namespace, *, api_key: str | None) -> int:
+    try:
+        db, scope = await _connect(api_key)
+    except SystemExit:
+        raise
+    except Exception as e:
+        print(f"GtmDB connect failed: {e}", file=sys.stderr)
+        return 1
+
+    from gtmdb.olap.materializer import ALL_LABELS, Materializer
+
+    labels = [args.label] if args.label else None
+    if labels and labels[0] not in ALL_LABELS:
+        print(
+            f"Unknown label '{args.label}'. Available: {', '.join(ALL_LABELS)}",
+            file=sys.stderr,
+        )
+        await db.close()
+        return 1
+
+    if db._olap_store is None:
+        print(
+            "OLAP store not configured or unreachable. "
+            "Check GTMDB_CLICKHOUSE_* env vars.",
+            file=sys.stderr,
+        )
+        await db.close()
+        return 1
+
+    mode = "[DRY RUN] " if args.dry_run else ""
+    target = args.label or "all labels"
+    print(f"{mode}Materializing {target} → OLAP store…")
+
+    def _progress(label: str, done: int, total: int) -> None:
+        pct = int(done / total * 100) if total else 0
+        print(f"  {label}: {done}/{total} ({pct}%)", end="\r", flush=True)
+
+    try:
+        mat = Materializer(
+            db._graph,
+            db._olap_store,
+            scope,
+            progress_cb=_progress,
+        )
+        stats = await mat.run(
+            labels=labels,
+            batch_size=args.batch_size,
+            dry_run=args.dry_run,
+        )
+        print()  # newline after \r progress
+        print(stats)
+    except Exception as e:
+        print(f"\nMaterialization failed: {e}", file=sys.stderr)
+        await db.close()
+        return 1
+
+    await db.close()
     return 0
 
 
@@ -163,6 +223,28 @@ def main() -> None:
     krot.add_argument("key_id", help="The key_id prefix to rotate.")
     krot.add_argument("--expires-days", type=int, default=None, help="Days until new key expires.")
 
+    # --- materialize ---
+    mat_p = sub.add_parser(
+        "materialize",
+        help="Bulk-migrate the Neo4j graph to the OLAP store (ClickHouse).",
+    )
+    mat_p.add_argument(
+        "--label",
+        default=None,
+        help="Only materialize this Neo4j label (e.g. Lead). Default: all labels.",
+    )
+    mat_p.add_argument(
+        "--batch-size",
+        type=int,
+        default=2000,
+        help="Nodes per bulk-insert chunk (default: 2000).",
+    )
+    mat_p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Count nodes and build lookups but do not insert into the OLAP store.",
+    )
+
     # --- serve ---
     serve_p = sub.add_parser("serve", help="Run the REST API server (FastAPI + uvicorn).")
     serve_p.add_argument(
@@ -180,7 +262,9 @@ def main() -> None:
     args = parser.parse_args()
     admin_key = _resolve_admin_key(getattr(args, "api_key", None))
 
-    if args.cmd == "init":
+    if args.cmd == "materialize":
+        raise SystemExit(asyncio.run(_run_materialize(args, api_key=admin_key)))
+    elif args.cmd == "init":
         raise SystemExit(asyncio.run(_run_init(seed=args.seed, api_key=admin_key)))
     elif args.cmd == "keys":
         raise SystemExit(asyncio.run(_run_keys(args, api_key=admin_key)))
