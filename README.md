@@ -56,6 +56,15 @@ Under the hood, entities live as **nodes and relationships in Neo4j**. Optional 
 - Admin key = `GTMDB_ADMIN_KEY` (full access + `/v1/admin/keys`).
 - Agent keys = stored in Postgres when `GTMDB_KEY_STORE_URL` is set.
 
+## A2A (Agent-to-Agent) Analyst
+
+The API exposes **A2A protocol v0.3** alongside REST:
+
+- **Agent Card:** `GET /.well-known/agent-card.json` (public discovery).
+- **JSON-RPC:** `POST /v1/a2a` — same `Authorization: Bearer` token as `/v1` (admin or Postgres-backed agent key). Streaming is supported (`message/stream`); the analyst emits task artifact chunks (JSON lines) for plan / step / result / answer / done, then completes with the final answer.
+
+Set **`GTMDB_PUBLIC_URL`** to your public API origin so the card’s `url` field points at the correct JSON-RPC endpoint behind proxies. For manual checks, use the [A2A samples](https://github.com/a2aproject/a2a-samples) client or inspector tooling compatible with spec 0.3.
+
 ## Deploy (Railway)
 
 1. Create a **Railway** project, connect this GitHub repo.

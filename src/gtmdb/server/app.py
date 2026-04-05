@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from gtmdb.client import GtmDB
 from gtmdb.config import GtmdbSettings
 from gtmdb.server.config import ServerSettings
+from gtmdb.server.a2a import install_a2a
 from gtmdb.server.middleware import ActivityLogMiddleware
 from gtmdb.server.routers import (
     accounts,
@@ -88,6 +89,7 @@ def create_app() -> FastAPI:
     v1.include_router(subscription_events.router)
     app.include_router(v1)
 
+    install_a2a(app)
     app.add_middleware(ActivityLogMiddleware)
 
     return app

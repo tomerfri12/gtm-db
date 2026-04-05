@@ -45,6 +45,9 @@ class GtmdbSettings(BaseSettings):
     planner_model: str = Field(default="gpt-4o-mini", description="Fast model for simple/single-engine queries")
     planner_model_complex: str = Field(default="gpt-4o", description="Capable model for multi-engine queries")
 
+    # Public API base URL (no trailing slash) for A2A Agent Card and clients behind proxies.
+    public_url: str = Field(default="", description="e.g. https://api.example.com — Agent Card JSON-RPC URL")
+
     model_config = {"env_prefix": "GTMDB_", "env_file": ".env", "extra": "ignore"}
 
     @field_validator("key_store_url", mode="before")
