@@ -62,7 +62,11 @@ async def lifespan(app):
         redact_mode="hint",
     )
     _scope = Scope(token)
-    _runner = AnalystRunner(db, scope=_scope)
+    _runner = AnalystRunner(
+        db,
+        scope=_scope,
+        trace_metadata={"source": "scripts.chat"},
+    )
 
     print("\n✓ Analyst ready (Full access) — open http://localhost:7433\n")
     yield

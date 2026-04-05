@@ -58,6 +58,8 @@ class AnalystRunner:
         Optional :class:`~gtmdb.scope.Scope` instance. When provided, the
         caller's permission set is injected into the agent's system prompt
         (Layer 1 awareness) and made available to the query guard (Layer 2).
+    trace_metadata:
+        Extra key/value pairs attached to LangSmith runs (e.g. ``{"source": "a2a"}``).
     """
 
     def __init__(
@@ -67,6 +69,7 @@ class AnalystRunner:
         tenant_id: str | None = None,
         model: str | None = None,
         scope=None,
+        trace_metadata: dict[str, Any] | None = None,
     ) -> None:
         self._db = db
         settings = GtmdbSettings()
@@ -75,6 +78,7 @@ class AnalystRunner:
         self._model = model or settings.planner_model
         self._api_key = settings.openai_api_key
         self._scope = scope
+        self._trace_metadata = dict(trace_metadata) if trace_metadata else {}
 
         if not self._api_key:
             raise ValueError(
@@ -106,12 +110,26 @@ class AnalystRunner:
             self._tenant_id, self._model,
         )
 
+    def _run_config(self) -> dict[str, Any]:
+        """LangGraph / LangSmith RunnableConfig (metadata + tags)."""
+        meta: dict[str, Any] = {"tenant_id": self._tenant_id}
+        if self._scope is not None:
+            kid = getattr(self._scope, "key_id", None)
+            if kid:
+                meta["key_id"] = kid
+            meta["owner_type"] = getattr(self._scope, "owner_type", "")
+        meta.update(self._trace_metadata)
+        return {"tags": ["gtmdb-analyst"], "metadata": meta}
+
     async def ask(self, question: str) -> AnalystResult:
         """Run a question to completion and return a structured result."""
         log.info("[analyst] ask: %s", question)
 
         messages = [HumanMessage(content=question)]
-        final_state = await self._graph.ainvoke({"messages": messages})
+        final_state = await self._graph.ainvoke(
+            {"messages": messages},
+            config=self._run_config(),
+        )
 
         all_messages = final_state["messages"]
         tool_calls = _extract_tool_calls(all_messages)
@@ -141,6 +159,7 @@ class AnalystRunner:
         async for event in self._graph.astream(
             {"messages": messages},
             stream_mode="values",
+            config=self._run_config(),
         ):
             last = event["messages"][-1]
 

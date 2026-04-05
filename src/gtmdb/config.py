@@ -48,11 +48,21 @@ class GtmdbSettings(BaseSettings):
     # Public API base URL (no trailing slash) for A2A Agent Card and clients behind proxies.
     public_url: str = Field(default="", description="e.g. https://api.example.com — Agent Card JSON-RPC URL")
 
+    # LangSmith (Analyst / LangChain traces). Set API key to enable; see gtmdb.tracing.configure_langsmith_env.
+    langsmith_api_key: str | None = Field(
+        default=None,
+        description="LangSmith API key — enables LANGCHAIN_TRACING_V2 for the Analyst",
+    )
+    langsmith_project: str = Field(
+        default="gtmdb-analyst",
+        description="LangSmith project name (LANGCHAIN_PROJECT)",
+    )
+
     model_config = {"env_prefix": "GTMDB_", "env_file": ".env", "extra": "ignore"}
 
-    @field_validator("key_store_url", mode="before")
+    @field_validator("key_store_url", "langsmith_api_key", mode="before")
     @classmethod
-    def _empty_key_store(cls, v: object) -> object:
+    def _empty_optional_str(cls, v: object) -> object:
         if v == "":
             return None
         return v

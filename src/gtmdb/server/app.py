@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from gtmdb.client import GtmDB
 from gtmdb.config import GtmdbSettings
 from gtmdb.server.config import ServerSettings
+from gtmdb.tracing import configure_langsmith_env
 from gtmdb.server.a2a import install_a2a
 from gtmdb.server.middleware import ActivityLogMiddleware
 from gtmdb.server.routers import (
@@ -39,6 +40,7 @@ from gtmdb.server.routers import (
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     gtmdb_settings = GtmdbSettings()
+    configure_langsmith_env(gtmdb_settings)
     server_settings = ServerSettings()
     db = GtmDB(gtmdb_settings)
     await db.connect()

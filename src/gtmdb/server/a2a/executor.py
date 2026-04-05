@@ -66,6 +66,11 @@ class GtmDBAnalystExecutor(AgentExecutor):
                 self._app.state.db,
                 scope=scope,
                 tenant_id=scope.tenant_id,
+                trace_metadata={
+                    "source": "a2a",
+                    "task_id": task_id,
+                    "context_id": context_id,
+                },
             )
         except ValueError as e:
             await updater.failed(

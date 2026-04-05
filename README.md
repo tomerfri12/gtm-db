@@ -67,6 +67,10 @@ Set **`GTMDB_PUBLIC_URL`** to your public API origin when the service is not beh
 
 Remote agents need a **Bearer token** identical to REST (`GTMDB_ADMIN_KEY` or a Postgres-backed agent key from `/v1/admin/keys`); share keys through your normal secret channel, not in the Agent Card.
 
+### Analyst observability (LangSmith)
+
+Set **`GTMDB_LANGSMITH_API_KEY`** (and optionally **`GTMDB_LANGSMITH_PROJECT`**, default `gtmdb-analyst`) so LangChain sends **LangGraph / tool** traces to [LangSmith](https://smith.langchain.com/). Runs are tagged `gtmdb-analyst` and include metadata such as `tenant_id`, `key_id`, `owner_type`, and for A2A: `source`, `task_id`, `context_id`. You can also set standard `LANGCHAIN_*` variables directly without the `GTMDB_` mapping.
+
 ## Deploy (Railway)
 
 1. Create a **Railway** project, connect this GitHub repo.
