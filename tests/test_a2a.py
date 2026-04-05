@@ -67,6 +67,25 @@ def test_agent_card_contains_rpc_url() -> None:
     assert any(s.get("id") == "gtmdb.analyst.query" for s in data["skills"])
 
 
+def test_agent_card_url_infers_x_forwarded_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without GTMDB_PUBLIC_URL, card url should follow reverse-proxy headers."""
+    monkeypatch.setenv("GTMDB_PUBLIC_URL", "")
+    app = FastAPI(lifespan=_minimal_lifespan)
+    install_a2a(app)
+    with TestClient(app) as client:
+        r = client.get(
+            "/.well-known/agent-card.json",
+            headers={
+                "X-Forwarded-Host": "api.example.com",
+                "X-Forwarded-Proto": "https",
+            },
+        )
+    assert r.status_code == 200
+    assert r.json()["url"] == "https://api.example.com/v1/a2a"
+
+
 def test_a2a_rpc_requires_bearer(monkeypatch: pytest.MonkeyPatch) -> None:
     app = _a2a_app(monkeypatch)
     with TestClient(app) as client:

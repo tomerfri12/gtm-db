@@ -10,11 +10,14 @@ from a2a.server.tasks import InMemoryTaskStore
 from fastapi import FastAPI
 
 from gtmdb.config import GtmdbSettings
-from gtmdb.server.a2a.agent_card import build_agent_card
+from gtmdb.server.a2a.agent_card import apply_card_url_modifier, build_agent_card
 from gtmdb.server.a2a.constants import A2A_RPC_PATH
 from gtmdb.server.a2a.context import GtmDBCallContextBuilder
 from gtmdb.server.a2a.executor import GtmDBAnalystExecutor
-from gtmdb.server.a2a.middleware import A2AAuthMiddleware
+from gtmdb.server.a2a.middleware import (
+    A2AAuthMiddleware,
+    AgentCardPublicBaseMiddleware,
+)
 from gtmdb.server.config import ServerSettings
 
 
@@ -45,6 +48,9 @@ def install_a2a(app: FastAPI) -> None:
         agent_card=card,
         http_handler=handler,
         context_builder=GtmDBCallContextBuilder(),
+        card_modifier=apply_card_url_modifier,
     )
     a2a.add_routes_to_app(app, rpc_url=A2A_RPC_PATH)
+    # Last added is outermost on the request: infer public URL for the card, then Bearer check for JSON-RPC.
     app.add_middleware(A2AAuthMiddleware, rpc_path=A2A_RPC_PATH)
+    app.add_middleware(AgentCardPublicBaseMiddleware)

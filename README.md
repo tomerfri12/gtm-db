@@ -63,7 +63,9 @@ The API exposes **A2A protocol v0.3** alongside REST:
 - **Agent Card:** `GET /.well-known/agent-card.json` (public discovery).
 - **JSON-RPC:** `POST /v1/a2a` — same `Authorization: Bearer` token as `/v1` (admin or Postgres-backed agent key). Streaming is supported (`message/stream`); the analyst emits task artifact chunks (JSON lines) for plan / step / result / answer / done, then completes with the final answer.
 
-Set **`GTMDB_PUBLIC_URL`** to your public API origin so the card’s `url` field points at the correct JSON-RPC endpoint behind proxies. For manual checks, use the [A2A samples](https://github.com/a2aproject/a2a-samples) client or inspector tooling compatible with spec 0.3.
+Set **`GTMDB_PUBLIC_URL`** to your public API origin when the service is not behind a proxy that sends `Host` / `X-Forwarded-Host` (that value wins if set). Otherwise the Agent Card infers the JSON-RPC `url` from those headers on each `GET /.well-known/agent-card.json`. For manual checks, use the [A2A samples](https://github.com/a2aproject/a2a-samples) client or inspector tooling compatible with spec 0.3.
+
+Remote agents need a **Bearer token** identical to REST (`GTMDB_ADMIN_KEY` or a Postgres-backed agent key from `/v1/admin/keys`); share keys through your normal secret channel, not in the Agent Card.
 
 ## Deploy (Railway)
 

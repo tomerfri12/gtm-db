@@ -6,8 +6,23 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from gtmdb.server.a2a.agent_card import (
+    pop_inferred_card_public_base,
+    push_inferred_card_public_base,
+)
 from gtmdb.server.a2a.auth import BearerAuthFailed, resolve_bearer_to_scope
 from gtmdb.server.a2a.constants import A2A_RPC_PATH
+
+
+class AgentCardPublicBaseMiddleware(BaseHTTPMiddleware):
+    """Set per-request inferred public URL so the Agent Card lists a reachable JSON-RPC endpoint."""
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
+        token = push_inferred_card_public_base(request)
+        try:
+            return await call_next(request)
+        finally:
+            pop_inferred_card_public_base(token)
 
 
 class A2AAuthMiddleware(BaseHTTPMiddleware):
