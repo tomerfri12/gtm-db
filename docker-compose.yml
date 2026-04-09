@@ -1,6 +1,35 @@
+# Local Neo4j + ClickHouse for gtmDB — run: docker compose up -d
+# Configure app env for localhost (Neo4j Bolt 7687, ClickHouse HTTP 8123); see .env.example.
+
 services:
-  # Note: Neo4j runs on Neo4j Aura (cloud) -- see GTMDB_NEO4J_URI in .env
-  # No local Neo4j service needed.
+  neo4j:
+    image: neo4j:5.26-community
+    restart: unless-stopped
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/devpassword
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "cypher-shell",
+          "-a",
+          "bolt://localhost:7687",
+          "-u",
+          "neo4j",
+          "-p",
+          "devpassword",
+          "RETURN 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
 
   clickhouse:
     image: clickhouse/clickhouse-server:25.3
@@ -26,4 +55,6 @@ services:
       retries: 10
 
 volumes:
+  neo4j-data:
+  neo4j-logs:
   clickhouse-data:

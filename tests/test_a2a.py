@@ -21,7 +21,7 @@ def _fixture_admin_key() -> str:
 
 
 class _FakeGraph:
-    async def astream(self, input, stream_mode=None):  # noqa: ANN001
+    async def astream(self, input, stream_mode=None, **kwargs):  # noqa: ANN001
         from langchain_core.messages import AIMessage
 
         msgs = list(input["messages"])
@@ -31,6 +31,9 @@ class _FakeGraph:
 class FakeAnalystRunner:
     def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
         self._graph = _FakeGraph()
+
+    def _run_config(self) -> dict:
+        return {"tags": ["gtmdb-analyst"], "metadata": {}}
 
 
 @asynccontextmanager

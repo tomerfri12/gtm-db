@@ -115,6 +115,7 @@ class GtmDBAnalystExecutor(AgentExecutor):
             async for event in runner._graph.astream(
                 {"messages": messages},
                 stream_mode="values",
+                config=runner._run_config(),
             ):
                 final_messages = event["messages"]
                 last = final_messages[-1]
