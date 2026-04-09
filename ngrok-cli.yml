@@ -1,0 +1,22 @@
+# Tunnel definitions only (no authtoken here). From repo root run:
+#   ./scripts/ngrok-local.sh
+# or: ngrok start --all --config ~/Library/Application\ Support/ngrok/ngrok.yml --config ngrok-cli.yml
+#
+# Ports must match docker-compose publish (Bolt 7688, Browser 7475, ClickHouse 8123).
+#
+# - gtmdb-neo4j-bolt: TCP → use public tcp://… as bolt://… in GTMDB_NEO4J_URI
+# - gtmdb-neo4j-browser: HTTP → open the https://… URL in a browser (Neo4j UI)
+# - gtmdb-clickhouse: HTTP on your reserved ngrok hostname (edit if yours differs)
+
+version: "2"
+tunnels:
+  gtmdb-neo4j-bolt:
+    proto: tcp
+    addr: 127.0.0.1:7688
+  gtmdb-neo4j-browser:
+    proto: http
+    addr: 127.0.0.1:7475
+  gtmdb-clickhouse:
+    proto: http
+    addr: 127.0.0.1:8123
+    hostname: tomer-gtmdb-local.ngrok.app

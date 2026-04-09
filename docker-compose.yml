@@ -1,15 +1,25 @@
 # Local Neo4j + ClickHouse for gtmDB — run: docker compose up -d
-# Configure app env for localhost (Neo4j Bolt 7687, ClickHouse HTTP 8123); see .env.example.
+#
+# Credentials match the app: Compose substitutes from `.env` using GTMDB_* names
+# (same as GtmdbSettings). Defaults suit local dev if those vars are unset.
+#
+# Neo4j Browser : http://localhost:<GTMDB_DOCKER_NEO4J_HTTP_PORT or 7474>
+# Neo4j Bolt    : bolt://localhost:<GTMDB_DOCKER_NEO4J_BOLT_PORT or 7687>
+#                 → set GTMDB_NEO4J_URI to that Bolt URL
+# ClickHouse HTTP: localhost:8123 (TLS off) → GTMDB_CLICKHOUSE_HOST / PORT
+#
+# Optional host port overrides when 7474 / 7687 are already taken:
+#   GTMDB_DOCKER_NEO4J_HTTP_PORT, GTMDB_DOCKER_NEO4J_BOLT_PORT
 
 services:
   neo4j:
     image: neo4j:5.26-community
     restart: unless-stopped
     ports:
-      - "7474:7474"
-      - "7687:7687"
+      - "${GTMDB_DOCKER_NEO4J_HTTP_PORT:-7474}:7474"
+      - "${GTMDB_DOCKER_NEO4J_BOLT_PORT:-7687}:7687"
     environment:
-      NEO4J_AUTH: neo4j/devpassword
+      NEO4J_AUTH: neo4j/${GTMDB_NEO4J_PASSWORD:-devpassword}
     volumes:
       - neo4j-data:/data
       - neo4j-logs:/logs
@@ -23,7 +33,7 @@ services:
           "-u",
           "neo4j",
           "-p",
-          "devpassword",
+          "${GTMDB_NEO4J_PASSWORD:-devpassword}",
           "RETURN 1",
         ]
       interval: 10s
@@ -35,14 +45,14 @@ services:
     image: clickhouse/clickhouse-server:25.3
     restart: unless-stopped
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - "${GTMDB_DOCKER_CLICKHOUSE_HTTP_PORT:-8123}:8123"
+      - "${GTMDB_DOCKER_CLICKHOUSE_NATIVE_PORT:-9000}:9000"
     volumes:
       - clickhouse-data:/var/lib/clickhouse
     environment:
-      CLICKHOUSE_DB: gtmdb
-      CLICKHOUSE_USER: dev
-      CLICKHOUSE_PASSWORD: devpassword
+      CLICKHOUSE_DB: ${GTMDB_CLICKHOUSE_DATABASE:-gtmdb}
+      CLICKHOUSE_USER: ${GTMDB_CLICKHOUSE_USER:-dev}
+      CLICKHOUSE_PASSWORD: ${GTMDB_CLICKHOUSE_PASSWORD:-devpassword}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     ulimits:
       nofile:
